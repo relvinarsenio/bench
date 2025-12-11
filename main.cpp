@@ -162,7 +162,6 @@ public:
         std::string line;
         while (std::getline(ss, line)) {
             if (line.find("model name") != std::string::npos) {
-                // FIX: Simpan dulu substring-nya di variabel 'raw' biar gak langsung hilang
                 std::string raw = line.substr(line.find(':') + 1);
                 return std::string(trim_sv(raw));
             }
@@ -453,8 +452,6 @@ public:
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outfile);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         
         curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, 
             +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
