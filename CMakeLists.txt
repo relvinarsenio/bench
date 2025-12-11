@@ -40,5 +40,5 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # --- 6. Build ---
-add_executable(bench bench.cpp)
+add_executable(bench main.cpp)
 target_link_libraries(bench PRIVATE CURL::libcurl m)
