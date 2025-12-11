@@ -103,7 +103,7 @@ Cukup jalankan binary yang sudah dicompile. Script akan otomatis mendeteksi nama
 
 ```text
 ------------------------------------------------------------------------------
- A Bench Script (Wrapper CSV Edition v6.9.5)
+ A Bench Script (Edition v6.9.6)
  Usage : ./bench
 ------------------------------------------------------------------------------
  -> CPU & Hardware

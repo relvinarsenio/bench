@@ -37,7 +37,7 @@ void run_app(std::string_view app_path) {
     std::print("\033c");
     std::cout << std::flush;
     print_line();
-    std::println(" A Bench Script (Wrapper CSV Edition v6.9.6)");
+    std::println(" A Bench Script (Edition v6.9.6)");
     std::println(" Usage : ./{}", app_name);
     print_line();
 
