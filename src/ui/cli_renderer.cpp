@@ -49,7 +49,7 @@ public:
     ~UiSpinner() { stop(); }
 };
 
-} // namespace
+}
 
 void render_disk_suite(const DiskSuiteResult& suite) {
     std::println("Running I/O Test (1GB File)...");
@@ -96,4 +96,4 @@ SpinnerCallback make_spinner_callback() {
     };
 }
 
-} // namespace CliRenderer
+}
