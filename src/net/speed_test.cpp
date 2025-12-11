@@ -1,5 +1,6 @@
 #include "include/speed_test.hpp"
 
+#include <cctype>
 #include <filesystem>
 #include <format>
 #include <print>
@@ -104,20 +105,29 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
     std::vector<Node> nodes = {
         {"", "Speedtest.net (Auto)"},
-        {"3864", "Los Angeles, US"},
-        {"57114", "Dallas, US"},
-        {"12723",  "Montreal, CA"},
-        {"5976",  "Paris, FR"},
+        {"59016", "Singapore, SG"},
+        {"5905", "Los Angeles, US"},
+        {"59219",  "Montreal, CA"},
+        {"41840",  "Paris, FR"},
         {"3386",  "Amsterdam, NL"},
-        {"22223",  "Beijing, CN"},
-        {"3633", "Shanghai, CN"},
-        {"17251", "Guangzhou, CN"},
-        {"1536",  "Hong Kong, CN"},
-        {"13623", "Singapore, SG"},
-        {"22247", "Tokyo, JP"}
+        {"39108", "Sydney, AU"},
+        {"7139", "Tokyo, JP"}
     };
 
     SpeedTestResult result;
+
+    auto sanitize_error = [](std::string msg) {
+        auto nl = msg.find('\n');
+        if (nl != std::string::npos) msg = msg.substr(0, nl);
+        while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) msg.pop_back();
+        while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
+        const std::string prefix = "Error: ";
+        if (msg.starts_with(prefix)) {
+            msg = msg.substr(prefix.size());
+            while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
+        }
+        return msg;
+    };
 
     for (const auto& node : nodes) {
         check_interrupted();
@@ -159,10 +169,12 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
                     else if (clean_err.find("No servers defined") != std::string::npos) {
                         entry.error = "Server ID Changed/Offline";
                         entry.success = false;
-                        result.entries.push_back(entry);
                         success = true;
                         break;
                     }
+                    clean_err = sanitize_error(clean_err);
+                    if (clean_err.empty()) clean_err = "Unknown error";
+                    entry.error = clean_err;
                     continue;
                 }
 
@@ -209,7 +221,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
                 if (err_idx != std::string::npos) {
                     error_msg = output.substr(err_idx + 8);
                 }
-                entry.error = error_msg;
+                entry.error = sanitize_error(error_msg);
             }
 
         } catch (const std::exception& e) {
