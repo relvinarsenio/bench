@@ -144,7 +144,7 @@ void SpeedTest::run() {
                             std::string loss_formatted;
                             try {
                                 double loss_val = std::stod(loss_raw);
-                                loss_formatted = std::format("{:.2f}%", loss_val);
+                                loss_formatted = std::format("{:.2f} %", loss_val);
                             } catch (...) {
                                 if (loss_raw == "N/A" || loss_raw.empty()) loss_formatted = "-";
                                 else loss_formatted = loss_raw;

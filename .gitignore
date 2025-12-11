@@ -1,0 +1,20 @@
+# Build artifacts
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/Makefile
+/compile_commands.json
+
+# Speedtest artifacts
+/speedtest.tgz
+/speedtest-cli/
+/benchtest_file
+
+# Common noise
+*.o
+*.a
+*.so
+*.swp
+.DS_Store
+.github/copilot-instructions.md
