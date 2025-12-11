@@ -129,7 +129,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
     SpeedTestResult result;
 
     for (const auto& node : nodes) {
-        check_interrupted();
+        if (g_interrupted.test()) break;
 
         std::string cmd = cli_path_.string() + " -f csv --accept-license --accept-gdpr";
         SpinnerScope spinner(spinner_cb, node.name);
@@ -221,6 +221,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
                     error_msg = output.substr(err_idx + 8);
                 }
                 entry.error = sanitize_error(error_msg);
+                if (entry.error.empty()) entry.error = "Interrupted / No Output";
             }
 
         } catch (const std::exception& e) {
