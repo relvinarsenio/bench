@@ -37,6 +37,19 @@ public:
     }
 };
 
+std::string sanitize_error(std::string msg) {
+    auto nl = msg.find('\n');
+    if (nl != std::string::npos) msg = msg.substr(0, nl);
+    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) msg.pop_back();
+    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
+    const std::string prefix = "Error: ";
+    if (msg.starts_with(prefix)) {
+        msg = msg.substr(prefix.size());
+        while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
+    }
+    return msg;
+}
+
 }
 
 namespace fs = std::filesystem;
@@ -115,19 +128,6 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
     };
 
     SpeedTestResult result;
-
-    auto sanitize_error = [](std::string msg) {
-        auto nl = msg.find('\n');
-        if (nl != std::string::npos) msg = msg.substr(0, nl);
-        while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) msg.pop_back();
-        while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
-        const std::string prefix = "Error: ";
-        if (msg.starts_with(prefix)) {
-            msg = msg.substr(prefix.size());
-            while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
-        }
-        return msg;
-    };
 
     for (const auto& node : nodes) {
         check_interrupted();

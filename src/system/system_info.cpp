@@ -35,6 +35,16 @@ const std::string& SystemInfo::get_cpuinfo_cache() {
     return cache;
 }
 
+namespace {
+
+std::string to_lower_copy(std::string_view s) {
+    std::string out(s);
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c){ return std::tolower(c); });
+    return out;
+}
+
+}
+
 std::string SystemInfo::get_model_name() {
     std::stringstream ss(get_cpuinfo_cache());
     std::string line;
@@ -54,11 +64,9 @@ std::string SystemInfo::get_model_name() {
 
         const std::array<std::string, 5> keys = {"model name", "hardware", "processor", "cpu", "Model"};
         while (std::getline(ss, line)) {
-            auto lower_line = line;
-            std::transform(lower_line.begin(), lower_line.end(), lower_line.begin(), [](unsigned char c){ return std::tolower(c); });
+            auto lower_line = to_lower_copy(line);
             for (const auto& k : keys) {
-                std::string lk = k;
-                std::transform(lk.begin(), lk.end(), lk.begin(), [](unsigned char c){ return std::tolower(c); });
+                std::string lk = to_lower_copy(k);
                 if (lower_line.rfind(lk, 0) == 0) {
                     auto colon = line.find(":");
                     if (colon != std::string::npos) {
