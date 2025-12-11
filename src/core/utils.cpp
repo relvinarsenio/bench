@@ -50,10 +50,22 @@ void cleanup_artifacts() {
         "speedtest-cli",
         std::string(Config::BENCH_FILENAME)
     };
+    const auto exe_dir = get_exe_dir();
     for (const auto& p : paths) {
         std::error_code ec;
         if (fs::exists(p, ec)) {
             fs::remove_all(p, ec);
         }
+        auto abs_path = exe_dir / p;
+        if (fs::exists(abs_path, ec)) {
+            fs::remove_all(abs_path, ec);
+        }
     }
+}
+
+std::filesystem::path get_exe_dir() {
+    std::error_code ec;
+    auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec && exe.has_parent_path()) return exe.parent_path();
+    return std::filesystem::current_path();
 }

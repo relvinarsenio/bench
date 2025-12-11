@@ -1,5 +1,7 @@
 #include "include/speed_test.hpp"
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -7,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <sys/utsname.h>
@@ -15,11 +18,52 @@
 #include "include/config.hpp"
 #include "include/http_client.hpp"
 #include "include/interrupts.hpp"
+#include "include/results.hpp"
 #include "include/shell_pipe.hpp"
+#include "include/utils.hpp"
+
+namespace {
+
+class Spinner {
+    std::atomic<bool> running_{false};
+    std::thread worker_;
+    std::string text_;
+
+public:
+    explicit Spinner(std::string text) : running_(true), text_(std::move(text)) {
+        worker_ = std::thread([this] {
+            static constexpr char frames[] = {'|', '/', '-', '\\'};
+            std::size_t idx = 0;
+            while (running_.load(std::memory_order_relaxed)) {
+                std::print("\r{} {}", text_, frames[idx++ % 4]);
+                std::cout.flush();
+                std::this_thread::sleep_for(std::chrono::milliseconds(150));
+            }
+        });
+    }
+
+    void stop() {
+        if (running_.exchange(false)) {
+            if (worker_.joinable()) worker_.join();
+            std::print("\r{}\r", std::string(text_.size() + 2, ' '));
+            std::cout.flush();
+        }
+    }
+
+    ~Spinner() { stop(); }
+};
+
+}
 
 namespace fs = std::filesystem;
 
-SpeedTest::SpeedTest(HttpClient& h) : http_(h), cli_path(Config::SPEEDTEST_CLI_PATH) {}
+SpeedTest::SpeedTest(HttpClient& h) : http_(h) {
+    base_dir_ = get_exe_dir();
+    std::filesystem::path cli_rel(Config::SPEEDTEST_CLI_PATH);
+    cli_dir_ = base_dir_ / cli_rel.parent_path();
+    cli_path_ = base_dir_ / cli_rel;
+    tgz_path_ = base_dir_ / Config::SPEEDTEST_TGZ;
+}
 
 std::string SpeedTest::get_arch() {
     struct utsname buf; uname(&buf);
@@ -50,29 +94,29 @@ std::vector<std::string> SpeedTest::parse_csv_line(const std::string& line) {
 }
 
 void SpeedTest::install() {
-    if (fs::exists(cli_path)) return;
+    if (fs::exists(cli_path_)) return;
 
     std::println("Downloading Speedtest CLI...");
     std::string url = std::format("https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{}.tgz", get_arch());
 
     try {
-        http_.download(url, std::string(Config::SPEEDTEST_TGZ));
+        http_.download(url, tgz_path_.string());
     } catch (...) {
         throw;
     }
 
-    fs::create_directories("speedtest-cli");
-    std::string tar_cmd = std::format("tar zxf {} -C ./speedtest-cli 2>&1", Config::SPEEDTEST_TGZ);
+    fs::create_directories(cli_dir_);
+    std::string tar_cmd = std::format("tar zxf {} -C {} 2>&1", tgz_path_.string(), cli_dir_.string());
     ShellPipe pipe(tar_cmd);
     pipe.read_all();
 
-    if (!fs::exists(cli_path)) throw std::runtime_error("Failed to extract speedtest-cli");
+    if (!fs::exists(cli_path_)) throw std::runtime_error("Failed to extract speedtest-cli");
 
-    fs::permissions(cli_path, fs::perms::owner_all, fs::perm_options::add);
-    fs::remove(Config::SPEEDTEST_TGZ);
+    fs::permissions(cli_path_, fs::perms::owner_all, fs::perm_options::add);
+    fs::remove(tgz_path_);
 }
 
-void SpeedTest::run() {
+SpeedTestResult SpeedTest::run() {
     struct Node { std::string id; std::string name; };
 
     std::vector<Node> nodes = {
@@ -90,18 +134,24 @@ void SpeedTest::run() {
         {"22247", "Tokyo, JP"}
     };
 
-    std::println("{:<24}{:<18}{:<18}{:<12}{:<8}", " Node Name", "Upload", "Download", "Latency", "Loss");
+    SpeedTestResult result;
 
     for (const auto& node : nodes) {
         check_interrupted();
 
-        std::string cmd = cli_path + " -f csv --accept-license --accept-gdpr";
+        std::string cmd = cli_path_.string() + " -f csv --accept-license --accept-gdpr";
+        Spinner spinner(std::format("Testing {}", node.name));
         if (!node.id.empty()) cmd += " --server-id=" + node.id;
         cmd += " 2>&1";
+
+        SpeedEntryResult entry;
+        entry.server_id = node.id;
+        entry.node_name = node.name;
 
         try {
             ShellPipe pipe(cmd);
             std::string output = pipe.read_all();
+            spinner.stop();
             std::stringstream ss(output);
             std::string line;
             bool success = false;
@@ -118,15 +168,18 @@ void SpeedTest::run() {
                     }
 
                     if (clean_err.find("Limit reached") != std::string::npos) {
-                        std::print("{}{: <24}{}Error: Rate Limit (Too many requests). Aborting.{}\n",
-                            Color::YELLOW, " " + node.name, Color::RED, Color::RESET);
-                        return;
+                        entry.error = "Rate Limit (Too many requests). Aborting.";
+                        entry.rate_limited = true;
+                        result.entries.push_back(entry);
+                        result.rate_limited = true;
+                        return result;
                     }
                     else if (clean_err.find("No servers defined") != std::string::npos) {
-                         std::print("{}{: <24}{}Error: Server ID Changed/Offline{}\n",
-                            Color::YELLOW, " " + node.name, Color::RED, Color::RESET);
-                         success = true;
-                         break;
+                        entry.error = "Server ID Changed/Offline";
+                        entry.success = false;
+                        result.entries.push_back(entry);
+                        success = true;
+                        break;
                     }
                     continue;
                 }
@@ -153,13 +206,11 @@ void SpeedTest::run() {
                             double dl_mbps = (dl_bytes * 8.0) / 1000000.0;
                             double ul_mbps = (ul_bytes * 8.0) / 1000000.0;
 
-                            std::print("{}{: <24}{}{:<18}{}{:<18}{}{:<12}{}{:<8}{}\n",
-                                Color::YELLOW, " " + node.name,
-                                Color::GREEN, std::format("{:.2f} Mbps", ul_mbps),
-                                Color::RED,   std::format("{:.2f} Mbps", dl_mbps),
-                                Color::CYAN,  std::format("{:.2f} ms", lat_val),
-                                Color::RED,   loss_formatted,
-                                Color::RESET);
+                            entry.upload_mbps = ul_mbps;
+                            entry.download_mbps = dl_mbps;
+                            entry.latency_ms = lat_val;
+                            entry.loss = loss_formatted;
+                            entry.success = true;
 
                             success = true;
                             break;
@@ -168,7 +219,7 @@ void SpeedTest::run() {
                 }
             }
 
-            if (!success) {
+            if (!success && !entry.success) {
                 std::string error_msg = output;
                 if (!output.empty() && output.back() == '\n') output.pop_back();
 
@@ -176,16 +227,16 @@ void SpeedTest::run() {
                 if (err_idx != std::string::npos) {
                     error_msg = output.substr(err_idx + 8);
                 }
-
-                if (error_msg.length() > 45) error_msg = error_msg.substr(0, 42) + "...";
-
-                std::print("{}{: <24}{}Error: {}{}\n",
-                    Color::YELLOW, " " + node.name, Color::RED, error_msg, Color::RESET);
+                entry.error = error_msg;
             }
 
         } catch (const std::exception& e) {
-            std::print("{}{: <24}{}Error: {}{}\n", Color::YELLOW, " " + node.name, Color::RED, e.what(), Color::RESET);
+            spinner.stop();
+            entry.error = e.what();
         }
-        std::cout << std::flush;
+        spinner.stop();
+        result.entries.push_back(entry);
     }
+
+    return result;
 }

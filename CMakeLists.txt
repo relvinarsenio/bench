@@ -50,6 +50,7 @@ add_executable(bench
     src/net/http_client.cpp
     src/io/disk_benchmark.cpp
     src/net/speed_test.cpp
+    src/ui/cli_renderer.cpp
 )
 
 target_include_directories(bench PRIVATE

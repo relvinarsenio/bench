@@ -8,17 +8,20 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
 
 #include <curl/curl.h>
 
+#include "include/cli_renderer.hpp"
 #include "include/color.hpp"
 #include "include/config.hpp"
 #include "include/disk_benchmark.hpp"
 #include "include/http_client.hpp"
 #include "include/interrupts.hpp"
+#include "include/results.hpp"
 #include "include/speed_test.hpp"
 #include "include/system_info.hpp"
 #include "include/utils.hpp"
@@ -124,21 +127,35 @@ void run_app(std::string_view app_path) {
 
     print_line();
 
-    std::println("Running I/O Test (1GB File)...");
-    double total_speed = 0.0;
+    std::vector<DiskRunResult> disk_runs;
+    disk_runs.reserve(3);
     for(int i=1; i<=3; ++i) {
         std::string label = std::format(" I/O Speed (Run #{}) : ", i);
-        double speed = DiskBenchmark::run_write_test(1024, label);
-        total_speed += speed;
-        std::println("{}", Color::colorize(std::format("{:.1f} MB/s", speed), Color::YELLOW));
+        auto progress_cb = [&](std::size_t current, std::size_t total, std::string_view lbl) {
+            int percent = static_cast<int>((current * 100) / total);
+            std::print("\r{} [{:3}%] ", lbl, percent);
+            std::cout << std::flush;
+        };
+
+        auto run = DiskBenchmark::run_write_test(1024, label, progress_cb);
+        std::print("\r{}\r", std::string(label.size() + 6, ' '));
+        std::cout << std::flush;
+        disk_runs.push_back(run);
     }
-    std::println(" I/O Speed (Average) : {}", Color::colorize(std::format("{:.1f} MB/s", total_speed / 3.0), Color::YELLOW));
+
+    double total_speed = 0.0;
+    for (const auto& r : disk_runs) total_speed += r.mbps;
+    double avg = disk_runs.empty() ? 0.0 : total_speed / static_cast<double>(disk_runs.size());
+    DiskSuiteResult suite{std::move(disk_runs), avg};
+
+    CliRenderer::render_disk_suite(suite);
 
     print_line();
 
     SpeedTest st(http);
     st.install();
-    st.run();
+    auto speed_result = st.run();
+    CliRenderer::render_speed_results(speed_result);
 
     print_line();
     auto end_time = high_resolution_clock::now();
