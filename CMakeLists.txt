@@ -40,5 +40,20 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # --- 6. Build ---
-add_executable(bench main.cpp)
+add_executable(bench
+    src/app/main.cpp
+    src/core/interrupts.cpp
+    src/core/utils.cpp
+    src/os/file_descriptor.cpp
+    src/os/shell_pipe.cpp
+    src/system/system_info.cpp
+    src/net/http_client.cpp
+    src/io/disk_benchmark.cpp
+    src/net/speed_test.cpp
+)
+
+target_include_directories(bench PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 target_link_libraries(bench PRIVATE CURL::libcurl m)
