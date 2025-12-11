@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+#if defined(__i386__) || defined(__x86_64__)
+#include <cpuid.h>
+#endif
+
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -34,13 +38,48 @@ const std::string& SystemInfo::get_cpuinfo_cache() {
 std::string SystemInfo::get_model_name() {
     std::stringstream ss(get_cpuinfo_cache());
     std::string line;
-    while (std::getline(ss, line)) {
-        if (line.find("model name") != std::string::npos) {
-            std::string raw = line.substr(line.find(':') + 1);
-            return std::string(trim_sv(raw));
+
+    #if defined(__i386__) || defined(__x86_64__)
+        unsigned int max_ext = __get_cpuid_max(0x80000000, nullptr);
+        if (max_ext >= 0x80000004) {
+            std::array<unsigned int, 12> data{};
+            __cpuid(0x80000002, data[0], data[1], data[2], data[3]);
+            __cpuid(0x80000003, data[4], data[5], data[6], data[7]);
+            __cpuid(0x80000004, data[8], data[9], data[10], data[11]);
+            std::string brand(reinterpret_cast<char*>(data.data()), 48);
+            brand = trim(brand);
+            if (!brand.empty()) return brand;
         }
-    }
-    return "Unknown CPU";
+    #endif
+
+        const std::array<std::string, 5> keys = {"model name", "hardware", "processor", "cpu", "Model"};
+        while (std::getline(ss, line)) {
+            auto lower_line = line;
+            std::transform(lower_line.begin(), lower_line.end(), lower_line.begin(), [](unsigned char c){ return std::tolower(c); });
+            for (const auto& k : keys) {
+                std::string lk = k;
+                std::transform(lk.begin(), lk.end(), lk.begin(), [](unsigned char c){ return std::tolower(c); });
+                if (lower_line.rfind(lk, 0) == 0) {
+                    auto colon = line.find(":");
+                    if (colon != std::string::npos) {
+                        auto model = trim(line.substr(colon + 1));
+                        if (!model.empty()) return model;
+                    }
+                }
+            }
+        }
+
+        std::ifstream dt("/sys/firmware/devicetree/base/model");
+        if (dt) {
+            std::string model;
+            std::getline(dt, model);
+            model = trim(model);
+            if (!model.empty()) return model;
+        }
+
+        struct utsname buf{};
+        if (::uname(&buf) == 0) return std::string(buf.machine);
+        return "Unknown CPU";
 }
 
 std::string SystemInfo::get_cpu_cores_freq() {
