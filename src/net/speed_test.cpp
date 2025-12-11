@@ -123,8 +123,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
         {"59219",  "Montreal, CA"},
         {"41840",  "Paris, FR"},
         {"3386",  "Amsterdam, NL"},
-        {"39108", "Sydney, AU"},
-        {"7139", "Tokyo, JP"}
+        {"39108", "Sydney, AU"}
     };
 
     SpeedTestResult result;
