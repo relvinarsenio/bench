@@ -690,20 +690,26 @@ public:
                                 double dl_bytes = std::stod(cols[5]);
                                 double ul_bytes = std::stod(cols[6]);
                                 double lat_val = std::stod(cols[2]);
-                                std::string loss = cols[4];
+                                
+                                std::string loss_raw = cols[4];
+                                std::string loss_formatted;
+                                try {
+                                    double loss_val = std::stod(loss_raw);
+                                    loss_formatted = std::format("{:.2f}%", loss_val);
+                                } catch (...) {
+                                    if (loss_raw == "N/A" || loss_raw.empty()) loss_formatted = "-";
+                                    else loss_formatted = loss_raw;
+                                }
 
                                 double dl_mbps = (dl_bytes * 8.0) / 1000000.0;
                                 double ul_mbps = (ul_bytes * 8.0) / 1000000.0;
-                                
-                                if (loss == "0") loss += "%";
-                                if (loss == "N/A") loss = "-";
                                 
                                 std::print("{}{:<24}{}{:<18}{}{:<18}{}{:<12}{}{:<8}{}\n", 
                                     Color::YELLOW, " " + node.name,
                                     Color::GREEN, std::format("{:.2f} Mbps", ul_mbps),
                                     Color::RED,   std::format("{:.2f} Mbps", dl_mbps),
                                     Color::CYAN,  std::format("{:.2f} ms", lat_val),
-                                    Color::RED,   loss,
+                                    Color::RED,   loss_formatted,
                                     Color::RESET);
                                 
                                 success = true;
