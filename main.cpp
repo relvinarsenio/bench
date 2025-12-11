@@ -6,22 +6,16 @@
 #include <filesystem>
 #include <format>
 #include <print>
-#include <regex>
 #include <chrono>
 #include <memory>
 #include <array>
-#include <thread>
-#include <cmath>
-#include <iomanip>
-#include <map>
-#include <set>
 #include <algorithm>
 #include <cstring>
 #include <csignal>
 #include <bit>          
 #include <system_error> 
-#include <expected>     
 #include <atomic>
+#include <set>
 
 #include <unistd.h>
 #include <sys/utsname.h>
@@ -118,6 +112,13 @@ std::string trim(const std::string& str) {
     return str.substr(first, (last - first + 1));
 }
 
+std::string_view trim_sv(std::string_view str) {
+    auto first = str.find_first_not_of(" \t\n\r");
+    if (first == std::string_view::npos) return {};
+    auto last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, last - first + 1);
+}
+
 std::string format_bytes(uint64_t bytes) {
     if (bytes == 0) return "0";
     const char* units[] = {"B", "KB", "MB", "GB", "TB"};
@@ -145,13 +146,24 @@ void cleanup_artifacts() {
 }
 
 class SystemInfo {
+    static const std::string& get_cpuinfo_cache() {
+        static std::string cache = []{
+            std::ifstream f("/proc/cpuinfo");
+            std::stringstream buffer;
+            buffer << f.rdbuf();
+            return buffer.str();
+        }();
+        return cache;
+    }
+
 public:
     static std::string get_model_name() {
-        std::ifstream cpu("/proc/cpuinfo");
+        std::stringstream ss(get_cpuinfo_cache());
         std::string line;
-        while (std::getline(cpu, line)) {
+        while (std::getline(ss, line)) {
             if (line.find("model name") != std::string::npos) {
-                return trim(line.substr(line.find(':') + 1));
+                std::string raw = line.substr(line.find(':') + 1);
+                return std::string(trim_sv(raw));
             }
         }
         return "Unknown CPU";
@@ -160,12 +172,14 @@ public:
     static std::string get_cpu_cores_freq() {
         int cores = get_nprocs();
         double freq_mhz = 0.0;
+        
         std::ifstream f("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
-        if (f >> freq_mhz) freq_mhz /= 1000.0;
-        else {
-            std::ifstream cpu("/proc/cpuinfo");
+        if (f >> freq_mhz) {
+            freq_mhz /= 1000.0;
+        } else {
+            std::stringstream ss(get_cpuinfo_cache());
             std::string line;
-            while(std::getline(cpu, line)) {
+            while(std::getline(ss, line)) {
                 if (line.starts_with("cpu MHz")) {
                     try {
                         freq_mhz = std::stod(line.substr(line.find(':') + 1));
@@ -210,17 +224,11 @@ public:
     }
 
     static bool has_aes() {
-        std::ifstream f("/proc/cpuinfo");
-        std::stringstream buffer;
-        buffer << f.rdbuf();
-        return buffer.str().find("aes") != std::string::npos;
+        return get_cpuinfo_cache().find("aes") != std::string::npos;
     }
 
     static bool has_vmx() {
-        std::ifstream f("/proc/cpuinfo");
-        std::stringstream buffer;
-        buffer << f.rdbuf();
-        std::string content = buffer.str();
+        const auto& content = get_cpuinfo_cache();
         return content.find("vmx") != std::string::npos || content.find("svm") != std::string::npos;
     }
 
@@ -387,12 +395,7 @@ public:
 
 class HttpClient {
     using CurlPtr = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
-    
-    CurlPtr create_handle() {
-        CURL* c = curl_easy_init();
-        if (!c) throw std::runtime_error("Failed to create curl handle");
-        return CurlPtr(c, curl_easy_cleanup);
-    }
+    CurlPtr handle_;
 
     static size_t write_string(void* ptr, size_t size, size_t nmemb, std::string* s) {
         s->append(static_cast<char*>(ptr), size * nmemb);
@@ -405,22 +408,30 @@ class HttpClient {
     }
 
 public:
+    HttpClient() : handle_(curl_easy_init(), curl_easy_cleanup) {
+        if (!handle_) throw std::runtime_error("Failed to create curl handle");
+    }
+
     std::string get(const std::string& url) {
-        auto curl = create_handle();
-        std::string response;
+        curl_easy_reset(handle_.get());
         
-        curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, write_string);
-        curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, 10L);
-        curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, 
+        std::string response;
+        CURL* curl = handle_.get();
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_string);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L); 
+        
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, 
             +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
                 return g_interrupted.test() ? 1 : 0;
             });
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
-        CURLcode res = curl_easy_perform(curl.get());
+        CURLcode res = curl_easy_perform(curl);
         check_interrupted(); 
 
         if (res != CURLE_OK) {
@@ -430,27 +441,29 @@ public:
     }
 
     void download(const std::string& url, const std::string& filepath) {
-        auto curl = create_handle();
+        curl_easy_reset(handle_.get());
+        
         std::ofstream outfile(filepath, std::ios::binary);
         if (!outfile) throw std::system_error(errno, std::generic_category(), "Failed to create file");
 
-        curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, write_file);
-        curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &outfile);
-        curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, 60L);
-        curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 0L);
-        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, 
+        CURL* curl = handle_.get();
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outfile);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, 
             +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
                 return g_interrupted.test() ? 1 : 0;
             });
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
-        CURLcode res = curl_easy_perform(curl.get());
+        CURLcode res = curl_easy_perform(curl);
         check_interrupted();
 
         if (res != CURLE_OK) {
+            outfile.close();
             fs::remove(filepath); 
             throw std::runtime_error(std::format("Download failed: {}", curl_easy_strerror(res)));
         }
@@ -458,12 +471,12 @@ public:
 
     bool check_connectivity(const std::string& host) {
         try {
-            auto curl = create_handle();
-            curl_easy_setopt(curl.get(), CURLOPT_URL, ("http://" + host).c_str());
-            curl_easy_setopt(curl.get(), CURLOPT_NOBODY, 1L); 
-            curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, 3L); 
-            CURLcode res = curl_easy_perform(curl.get());
-            return res == CURLE_OK;
+            curl_easy_reset(handle_.get());
+            CURL* curl = handle_.get();
+            curl_easy_setopt(curl, CURLOPT_URL, ("http://" + host).c_str());
+            curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); 
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L); 
+            return curl_easy_perform(curl) == CURLE_OK;
         } catch (...) {
             return false;
         }
@@ -788,15 +801,20 @@ void run_app(std::string_view app_path) {
 
     try {
         std::string json = http.get("http://ipinfo.io/json");
-        auto extract = [&](const std::string& key) {
-            try {
-                std::regex r("\"" + key + "\":\\s*\"([^\"]+)\"");
-                std::smatch m;
-                return std::regex_search(json, m, r) ? m[1].str() : "";
-            } catch (const std::regex_error&) {
-                return std::string("Error");
-            }
+        auto extract = [&](std::string_view key) -> std::string {
+            std::string search_key = std::format("\"{}\":", key);
+            size_t pos = json.find(search_key);
+            if (pos == std::string::npos) return "";
+            
+            pos += search_key.length();
+            while (pos < json.length() && (json[pos] == ' ' || json[pos] == '"')) pos++;
+            
+            size_t end = json.find('"', pos);
+            if (end == std::string::npos) return "";
+            
+            return json.substr(pos, end - pos);
         };
+
         std::string org = extract("org");
         if (!org.empty()) std::println(" {:<20} : {}", "ISP", Color::colorize(org, Color::CYAN));
         std::println(" {:<20} : {} / {}", "Location", Color::colorize(extract("city"), Color::CYAN), Color::colorize(extract("country"), Color::CYAN));
