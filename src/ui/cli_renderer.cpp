@@ -1,12 +1,55 @@
 #include "include/cli_renderer.hpp"
 
+#include <atomic>
+#include <chrono>
 #include <format>
+#include <iostream>
+#include <memory>
 #include <print>
 #include <string>
+#include <string_view>
+#include <thread>
 
 #include "include/color.hpp"
+#include "include/speed_test.hpp"
 
 namespace CliRenderer {
+
+namespace {
+
+class UiSpinner {
+    std::atomic<bool> running_{false};
+    std::thread worker_;
+    std::string text_;
+
+public:
+    void start(std::string_view text) {
+        stop();
+        text_ = text;
+        running_.store(true, std::memory_order_relaxed);
+        worker_ = std::thread([this] {
+            static constexpr char frames[] = {'|', '/', '-', '\\'};
+            std::size_t idx = 0;
+            while (running_.load(std::memory_order_relaxed)) {
+                std::print("\r{} {}", text_, frames[idx++ % 4]);
+                std::cout.flush();
+                std::this_thread::sleep_for(std::chrono::milliseconds(150));
+            }
+        });
+    }
+
+    void stop() {
+        if (running_.exchange(false, std::memory_order_relaxed)) {
+            if (worker_.joinable()) worker_.join();
+            std::print("\r{}\r", std::string(text_.size() + 2, ' '));
+            std::cout.flush();
+        }
+    }
+
+    ~UiSpinner() { stop(); }
+};
+
+} // namespace
 
 void render_disk_suite(const DiskSuiteResult& suite) {
     std::println("Running I/O Test (1GB File)...");
@@ -37,6 +80,20 @@ void render_speed_results(const SpeedTestResult& result) {
             Color::RED,   entry.loss.empty() ? "-" : entry.loss,
             Color::RESET);
     }
+}
+
+SpinnerCallback make_spinner_callback() {
+    auto spinner = std::make_shared<UiSpinner>();
+    return [spinner](SpinnerEvent ev, std::string_view label) {
+        switch (ev) {
+            case SpinnerEvent::Start:
+                spinner->start(label);
+                break;
+            case SpinnerEvent::Stop:
+                spinner->stop();
+                break;
+        }
+    };
 }
 
 } // namespace CliRenderer

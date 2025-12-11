@@ -1,12 +1,17 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "results.hpp"
 
 class HttpClient;
+
+enum class SpinnerEvent { Start, Stop };
+using SpinnerCallback = std::function<void(SpinnerEvent, std::string_view)>;
 
 class SpeedTest {
     HttpClient& http_;
@@ -21,5 +26,5 @@ class SpeedTest {
 public:
     explicit SpeedTest(HttpClient& h);
     void install();
-    SpeedTestResult run();
+    SpeedTestResult run(const SpinnerCallback& spinner_cb = {});
 };

@@ -1,20 +1,16 @@
 #include "include/speed_test.hpp"
 
-#include <atomic>
-#include <chrono>
 #include <filesystem>
 #include <format>
-#include <iostream>
 #include <print>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <thread>
+#include <string_view>
 #include <vector>
 
 #include <sys/utsname.h>
 
-#include "include/color.hpp"
 #include "include/config.hpp"
 #include "include/http_client.hpp"
 #include "include/interrupts.hpp"
@@ -24,33 +20,20 @@
 
 namespace {
 
-class Spinner {
-    std::atomic<bool> running_{false};
-    std::thread worker_;
-    std::string text_;
+class SpinnerScope {
+    const SpinnerCallback& cb_;
+    std::string_view label_;
+    bool active_ = false;
 
 public:
-    explicit Spinner(std::string text) : running_(true), text_(std::move(text)) {
-        worker_ = std::thread([this] {
-            static constexpr char frames[] = {'|', '/', '-', '\\'};
-            std::size_t idx = 0;
-            while (running_.load(std::memory_order_relaxed)) {
-                std::print("\r{} {}", text_, frames[idx++ % 4]);
-                std::cout.flush();
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
-            }
-        });
+    SpinnerScope(const SpinnerCallback& cb, std::string_view label) : cb_(cb), label_(label) {
+        active_ = static_cast<bool>(cb_);
+        if (active_) cb_(SpinnerEvent::Start, label_);
     }
 
-    void stop() {
-        if (running_.exchange(false)) {
-            if (worker_.joinable()) worker_.join();
-            std::print("\r{}\r", std::string(text_.size() + 2, ' '));
-            std::cout.flush();
-        }
+    ~SpinnerScope() {
+        if (active_) cb_(SpinnerEvent::Stop, label_);
     }
-
-    ~Spinner() { stop(); }
 };
 
 }
@@ -116,7 +99,7 @@ void SpeedTest::install() {
     fs::remove(tgz_path_);
 }
 
-SpeedTestResult SpeedTest::run() {
+SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
     struct Node { std::string id; std::string name; };
 
     std::vector<Node> nodes = {
@@ -140,7 +123,7 @@ SpeedTestResult SpeedTest::run() {
         check_interrupted();
 
         std::string cmd = cli_path_.string() + " -f csv --accept-license --accept-gdpr";
-        Spinner spinner(std::format("Testing {}", node.name));
+        SpinnerScope spinner(spinner_cb, node.name);
         if (!node.id.empty()) cmd += " --server-id=" + node.id;
         cmd += " 2>&1";
 
@@ -151,7 +134,6 @@ SpeedTestResult SpeedTest::run() {
         try {
             ShellPipe pipe(cmd);
             std::string output = pipe.read_all();
-            spinner.stop();
             std::stringstream ss(output);
             std::string line;
             bool success = false;
@@ -231,10 +213,8 @@ SpeedTestResult SpeedTest::run() {
             }
 
         } catch (const std::exception& e) {
-            spinner.stop();
             entry.error = e.what();
         }
-        spinner.stop();
         result.entries.push_back(entry);
     }
 

@@ -154,7 +154,8 @@ void run_app(std::string_view app_path) {
 
     SpeedTest st(http);
     st.install();
-    auto speed_result = st.run();
+    auto spinner_cb = CliRenderer::make_spinner_callback();
+    auto speed_result = st.run(spinner_cb);
     CliRenderer::render_speed_results(speed_result);
 
     print_line();
