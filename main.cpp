@@ -397,14 +397,23 @@ class HttpClient {
     using CurlPtr = std::unique_ptr<CURL, decltype(&curl_easy_cleanup)>;
     CurlPtr handle_;
 
-    static size_t write_string(void* ptr, size_t size, size_t nmemb, std::string* s) {
-        s->append(static_cast<char*>(ptr), size * nmemb);
-        return size * nmemb;
+    static size_t write_string(void* ptr, size_t size, size_t nmemb, std::string* s) noexcept {
+        try {
+            s->append(static_cast<char*>(ptr), size * nmemb);
+            return size * nmemb;
+        } catch (...) {
+            return 0;
+        }
     }
 
-    static size_t write_file(void* ptr, size_t size, size_t nmemb, std::ofstream* f) {
-        f->write(static_cast<char*>(ptr), size * nmemb);
-        return size * nmemb;
+    static size_t write_file(void* ptr, size_t size, size_t nmemb, std::ofstream* f) noexcept {
+        try {
+            f->write(static_cast<char*>(ptr), size * nmemb);
+            if (!*f) return 0;
+            return size * nmemb;
+        } catch (...) {
+            return 0;
+        }
     }
 
 public:
