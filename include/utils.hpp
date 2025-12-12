@@ -17,7 +17,7 @@ template <typename StringType>
 	return str.substr(first, last - first + 1);
 }
 
-} // namespace detail
+}
 
 [[nodiscard]] std::string trim(const std::string& str);
 [[nodiscard]] constexpr std::string_view trim_sv(std::string_view str) noexcept {
