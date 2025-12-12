@@ -21,7 +21,7 @@ void print_line() {
 namespace {
 
 template <typename StringType>
-auto trim_generic(StringType str) {
+[[nodiscard]] constexpr auto trim_generic(const StringType& str) {
     auto first = str.find_first_not_of(" \t\n\r");
     if (first == StringType::npos) return StringType{};
     auto last = str.find_last_not_of(" \t\n\r");
@@ -30,11 +30,11 @@ auto trim_generic(StringType str) {
 
 } // namespace
 
-std::string trim(const std::string& str) {
+[[nodiscard]] std::string trim(const std::string& str) {
     return trim_generic(str);
 }
 
-std::string_view trim_sv(std::string_view str) {
+[[nodiscard]] constexpr std::string_view trim_sv(std::string_view str) noexcept {
     return trim_generic(str);
 }
 
