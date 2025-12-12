@@ -5,5 +5,5 @@
 
 extern volatile sig_atomic_t g_interrupted;
 
-void signal_handler(int);
+void signal_handler(int) noexcept;
 void check_interrupted();

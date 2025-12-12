@@ -129,7 +129,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
     SpeedTestResult result;
 
     for (const auto& node : nodes) {
-        if (g_interrupted.test()) break;
+        if (g_interrupted) break;
 
         std::string cmd = cli_path_.string() + " -f csv --accept-license --accept-gdpr";
         SpinnerScope spinner(spinner_cb, node.name);
