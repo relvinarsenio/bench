@@ -1,9 +1,9 @@
 #pragma once
 
-#include <atomic>
+#include <csignal>
 #include <stdexcept>
 
-extern std::atomic_flag g_interrupted;
+extern volatile sig_atomic_t g_interrupted;
 
 void signal_handler(int);
 void check_interrupted();

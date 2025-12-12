@@ -47,7 +47,7 @@ std::string HttpClient::get(const std::string& url) {
 
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
-            return g_interrupted.test() ? 1 : 0;
+                return g_interrupted ? 1 : 0;
         });
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
@@ -75,7 +75,7 @@ void HttpClient::download(const std::string& url, const std::string& filepath) {
 
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
-            return g_interrupted.test() ? 1 : 0;
+                return g_interrupted ? 1 : 0;
         });
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
