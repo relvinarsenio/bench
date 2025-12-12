@@ -91,16 +91,14 @@ std::vector<std::string> SpeedTest::parse_csv_line(const std::string& line) {
 }
 
 void SpeedTest::install() {
-    if (fs::exists(cli_path_)) return;
+    std::error_code ec;
+    fs::remove(tgz_path_, ec);
+    fs::remove_all(cli_dir_, ec);
 
     std::println("Downloading Speedtest CLI...");
     std::string url = std::format("https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{}.tgz", get_arch());
 
-    try {
-        http_.download(url, tgz_path_.string());
-    } catch (...) {
-        throw;
-    }
+    http_.download(url, tgz_path_.string());
 
     fs::create_directories(cli_dir_);
     std::string tar_cmd = std::format("tar zxf {} -C {} 2>&1", tgz_path_.string(), cli_dir_.string());
@@ -123,7 +121,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
         {"59219",  "Montreal, CA"},
         {"41840",  "Paris, FR"},
         {"3386",  "Amsterdam, NL"},
-        {"39108", "Sydney, AU"}
+        {"46114", "Melbourne, AU"}
     };
 
     SpeedTestResult result;
