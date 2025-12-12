@@ -18,18 +18,24 @@ void print_line() {
     std::cout << std::flush;
 }
 
-std::string trim(const std::string& str) {
+namespace {
+
+template <typename StringType>
+auto trim_generic(StringType str) {
     auto first = str.find_first_not_of(" \t\n\r");
-    if (std::string::npos == first) return "";
+    if (first == StringType::npos) return StringType{};
     auto last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
+    return str.substr(first, last - first + 1);
+}
+
+} // namespace
+
+std::string trim(const std::string& str) {
+    return trim_generic(str);
 }
 
 std::string_view trim_sv(std::string_view str) {
-    auto first = str.find_first_not_of(" \t\n\r");
-    if (first == std::string_view::npos) return {};
-    auto last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, last - first + 1);
+    return trim_generic(str);
 }
 
 std::string format_bytes(std::uint64_t bytes) {
