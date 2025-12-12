@@ -47,7 +47,7 @@ DiskRunResult DiskBenchmark::run_write_test(
     DiskBenchmarkBuffer buffer(block_size, Config::IO_ALIGNMENT);
     std::memset(buffer.data(), 0, block_size);
 
-    int flags = O_WRONLY | O_CREAT | O_TRUNC;
+    int flags = O_WRONLY | O_CREAT | O_TRUNC | O_EXCL;
     #ifdef O_DIRECT
     flags |= O_DIRECT;
     #endif
