@@ -1,4 +1,5 @@
 #include "include/http_client.hpp"
+#include "include/interrupts.hpp"
 
 #include <cerrno>
 #include <filesystem>
@@ -7,7 +8,21 @@
 #include <stdexcept>
 #include <system_error>
 
-#include "include/interrupts.hpp"
+namespace {
+    class CurlHeaders {
+        struct curl_slist* list_ = nullptr;
+    public:
+        CurlHeaders() = default;
+        ~CurlHeaders() { if (list_) curl_slist_free_all(list_); }
+        CurlHeaders(const CurlHeaders&) = delete;
+        CurlHeaders& operator=(const CurlHeaders&) = delete;
+        void add(const std::string& header) {
+            struct curl_slist* temp = curl_slist_append(list_, header.c_str());
+            if (temp) list_ = temp;
+        }
+        struct curl_slist* get() const { return list_; }
+    };
+}
 
 HttpClient::HttpClient() : handle_(curl_easy_init(), curl_easy_cleanup) {
     if (!handle_) throw std::runtime_error("Failed to create curl handle");
@@ -38,9 +53,17 @@ std::string HttpClient::get(const std::string& url) {
     std::string response;
     CURL* curl = handle_.get();
 
+    CurlHeaders headers;
+    headers.add("Accept-Language: en-US,en;q=0.9");
+    headers.add("Accept: application/json, text/javascript, */*; q=0.01");
+
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_string);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers.get());
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(curl, CURLOPT_REFERER, "https://www.google.com/");
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
@@ -68,6 +91,9 @@ void HttpClient::download(const std::string& url, const std::string& filepath) {
 
     CURL* curl = handle_.get();
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
+    curl_easy_setopt(curl, CURLOPT_REFERER, "https://www.google.com/");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &outfile);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);

@@ -103,25 +103,41 @@ void run_app(std::string_view app_path) {
     );
 
     try {
-        std::string json = http.get("http://ipinfo.io/json");
+        std::string json = http.get("http://ip-api.com/json");
+
         auto extract = [&](std::string_view key) -> std::string {
-            std::string search_key = std::format("\"{}\":", key);
+            std::string search_key = std::format("\"{}\"", key);
             size_t pos = json.find(search_key);
             if (pos == std::string::npos) return "";
+            pos = json.find(':', pos);
+            if (pos == std::string::npos) return "";
+            ++pos;
+            while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) ++pos;
+            if (pos >= json.size()) return "";
 
-            pos += search_key.length();
-            while (pos < json.length() && (json[pos] == ' ' || json[pos] == '"')) pos++;
+            if (json[pos] == '"') {
+                ++pos;
+                size_t end = json.find('"', pos);
+                if (end == std::string::npos) return "";
+                return json.substr(pos, end - pos);
+            }
 
-            size_t end = json.find('"', pos);
-            if (end == std::string::npos) return "";
-
+            size_t end = pos;
+            while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != '\n' && json[end] != '\r') ++end;
+            while (end > pos && std::isspace(static_cast<unsigned char>(json[end - 1]))) --end;
             return json.substr(pos, end - pos);
         };
 
-        std::string org = extract("org");
+        std::string org = extract("as");
         if (!org.empty()) std::println(" {:<20} : {}", "ISP", Color::colorize(org, Color::CYAN));
-        std::println(" {:<20} : {} / {}", "Location", Color::colorize(extract("city"), Color::CYAN), Color::colorize(extract("country"), Color::CYAN));
-        std::string region = extract("region");
+
+        auto city = extract("city");
+        auto country = extract("country");
+        std::println(" {:<20} : {} / {}", "Location",
+            Color::colorize(city.empty() ? "-" : city, Color::CYAN),
+            Color::colorize(country.empty() ? "-" : country, Color::CYAN));
+
+        std::string region = extract("regionName");
         if (!region.empty()) std::println(" {:<20} : {}", "Region", Color::colorize(region, Color::CYAN));
     } catch (const std::exception&) {
         std::println(" {:<20} : {}", "IP Info", Color::colorize("Failed to fetch", Color::RED));
