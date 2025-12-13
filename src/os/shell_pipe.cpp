@@ -13,7 +13,7 @@ ShellPipe::ShellPipe(const std::string& command) {
 }
 
 std::string ShellPipe::read_all() {
-    std::array<char, 3072> buffer;
+    std::array<char, 4096> buffer;
     std::string result;
     while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe_.get()) != nullptr) {
         result += buffer.data();
