@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <cctype>
 
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
@@ -123,25 +124,39 @@ void run_app(std::string_view app_path) {
 
         auto extract = [&](std::string_view key) -> std::string {
             std::string search_key = std::format("\"{}\"", key);
-            size_t pos = json.find(search_key);
-            if (pos == std::string::npos) return "";
-            pos = json.find(':', pos);
-            if (pos == std::string::npos) return "";
-            ++pos;
-            while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) ++pos;
-            if (pos >= json.size()) return "";
-
-            if (json[pos] == '"') {
+            size_t pos = 0;
+            while (true) {
+                pos = json.find(search_key, pos);
+                if (pos == std::string::npos) return "";
+                pos = json.find(':', pos + search_key.size());
+                if (pos == std::string::npos) return "";
                 ++pos;
-                size_t end = json.find('"', pos);
-                if (end == std::string::npos) return "";
+                while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) ++pos;
+                if (pos >= json.size()) return "";
+
+                if (json[pos] == '"') {
+                    ++pos;
+                    std::string out;
+                    bool esc = false;
+                    for (size_t i = pos; i < json.size(); ++i) {
+                        char c = json[i];
+                        if (esc) {
+                            out.push_back(c);
+                            esc = false;
+                            continue;
+                        }
+                        if (c == '\\') { esc = true; continue; }
+                        if (c == '"') return out;
+                        out.push_back(c);
+                    }
+                    return "";
+                }
+
+                size_t end = pos;
+                while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != '\n' && json[end] != '\r') ++end;
+                while (end > pos && std::isspace(static_cast<unsigned char>(json[end - 1]))) --end;
                 return json.substr(pos, end - pos);
             }
-
-            size_t end = pos;
-            while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != '\n' && json[end] != '\r') ++end;
-            while (end > pos && std::isspace(static_cast<unsigned char>(json[end - 1]))) --end;
-            return json.substr(pos, end - pos);
         };
 
         std::string org = extract("as");
