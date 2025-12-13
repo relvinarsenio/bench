@@ -24,7 +24,9 @@ void print_line() {
 
 std::string format_bytes(std::uint64_t bytes) {
     if (bytes == 0) return "0";
-    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    
+    static constexpr std::array units = {"B", "KB", "MB", "GB", "TB"};
+    
     int i = 0;
     double d = static_cast<double>(bytes);
     while (d >= 1024 && i < 4) {

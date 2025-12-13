@@ -168,6 +168,14 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
         try {
             ShellPipe pipe(cmd_args);
             std::string output = pipe.read_all();
+            
+            if (g_interrupted) {
+                entry.success = false;
+                entry.error = "Interrupted by user";
+                result.entries.push_back(entry);
+                break;
+            }
+
             std::stringstream ss(output);
             std::string line;
             bool success = false;
@@ -225,15 +233,19 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
             }
 
             if (!success && !entry.success) {
-                std::string error_msg = output;
-                if (!output.empty() && output.back() == '\n') output.pop_back();
+                if (g_interrupted) {
+                    entry.error = "Interrupted by user";
+                } else {
+                    std::string error_msg = output;
+                    if (!output.empty() && output.back() == '\n') output.pop_back();
 
-                size_t err_idx = output.find("[error] ");
-                if (err_idx != std::string::npos) {
-                    error_msg = output.substr(err_idx + 8);
+                    size_t err_idx = output.find("[error] ");
+                    if (err_idx != std::string::npos) {
+                        error_msg = output.substr(err_idx + 8);
+                    }
+                    entry.error = sanitize_error(error_msg);
+                    if (entry.error.empty()) entry.error = "Interrupted / No Output";
                 }
-                entry.error = sanitize_error(error_msg);
-                if (entry.error.empty()) entry.error = "Interrupted / No Output";
             }
 
         } catch (const std::exception& e) {

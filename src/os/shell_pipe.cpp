@@ -13,6 +13,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "include/interrupts.hpp"
+
 ShellPipe::ShellPipe(const std::vector<std::string>& args) {
     if (args.empty()) {
         throw std::invalid_argument("ShellPipe: Empty argument list");
@@ -72,12 +74,26 @@ std::string ShellPipe::read_all() {
     std::array<char, 4096> buffer;
     ssize_t bytes_read;
 
-    while ((bytes_read = ::read(read_fd_, buffer.data(), buffer.size())) > 0) {
-        output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
-    }
+    while (true) {
+        if (g_interrupted) {
+            break; 
+        }
 
-    if (bytes_read == -1) {
-        throw std::system_error(errno, std::generic_category(), "Failed to read from pipe");
+        bytes_read = ::read(read_fd_, buffer.data(), buffer.size());
+        
+        if (bytes_read > 0) {
+            output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
+        } else if (bytes_read == 0) {
+            break;
+        } else {
+            if (errno == EINTR) {
+                if (g_interrupted) {
+                    break;
+                }
+                continue;
+            }
+            throw std::system_error(errno, std::generic_category(), "Failed to read from pipe");
+        }
     }
 
     int status;

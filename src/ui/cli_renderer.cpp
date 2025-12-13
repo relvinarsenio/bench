@@ -1,6 +1,5 @@
 #include "include/cli_renderer.hpp"
 
-#include <atomic>
 #include <chrono>
 #include <format>
 #include <iostream>
@@ -9,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 #include "include/color.hpp"
 #include "include/speed_test.hpp"
@@ -18,35 +18,32 @@ namespace CliRenderer {
 namespace {
 
 class UiSpinner {
-    std::atomic<bool> running_{false};
-    std::thread worker_;
+    std::jthread worker_;
     std::string text_;
 
 public:
     void start(std::string_view text) {
-        stop();
         text_ = text;
-        running_.store(true, std::memory_order_relaxed);
-        worker_ = std::thread([this] {
-            static constexpr char frames[] = {'|', '/', '-', '\\'};
+
+        worker_ = std::jthread([this](std::stop_token st) {
+            static constexpr std::string_view frames = "|/-\\";
             std::size_t idx = 0;
-            while (running_.load(std::memory_order_relaxed)) {
-                std::print("\r{} {}", text_, frames[idx++ % 4]);
+            
+            while (!st.stop_requested()) {
+                std::print("\r{} {}", text_, frames[idx++ % frames.size()]);
                 std::cout.flush();
+                
                 std::this_thread::sleep_for(std::chrono::milliseconds(150));
             }
+
+            std::print("\r{}\r", std::string(text_.size() + 2, ' '));
+            std::cout.flush();
         });
     }
 
     void stop() {
-        if (running_.exchange(false, std::memory_order_relaxed)) {
-            if (worker_.joinable()) worker_.join();
-            std::print("\r{}\r", std::string(text_.size() + 2, ' '));
-            std::cout.flush();
-        }
+        worker_ = std::jthread();
     }
-
-    ~UiSpinner() { stop(); }
 };
 
 }
