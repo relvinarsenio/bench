@@ -1,1 +1,1 @@
-Just a stupid project.
+# Just a stupid project.
