@@ -1,4 +1,6 @@
 #include "include/system_info.hpp"
+#include "include/utils.hpp"
+#include "include/shell_pipe.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,12 +23,24 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#include "include/utils.hpp"
-
 namespace fs = std::filesystem;
 
+namespace {
+    std::string capitalize(std::string s) {
+        if (!s.empty()) s[0] = static_cast<char>(std::toupper(s[0]));
+        if (s == "Zram") return "ZRAM";
+        return s;
+    }
+
+    std::string to_lower_copy(std::string_view s) {
+        std::string out(s);
+        std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c){ return std::tolower(c); });
+        return out;
+    }
+}
+
 const std::string& SystemInfo::get_cpuinfo_cache() {
-    static std::string cache = []{
+    static const std::string cache = []{
         std::ifstream f("/proc/cpuinfo");
         std::stringstream buffer;
         buffer << f.rdbuf();
@@ -35,20 +49,7 @@ const std::string& SystemInfo::get_cpuinfo_cache() {
     return cache;
 }
 
-namespace {
-
-std::string to_lower_copy(std::string_view s) {
-    std::string out(s);
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c){ return std::tolower(c); });
-    return out;
-}
-
-}
-
 std::string SystemInfo::get_model_name() {
-    std::stringstream ss(get_cpuinfo_cache());
-    std::string line;
-
     #if defined(__i386__) || defined(__x86_64__)
         unsigned int max_ext = __get_cpuid_max(0x80000000, nullptr);
         if (max_ext >= 0x80000004) {
@@ -62,36 +63,40 @@ std::string SystemInfo::get_model_name() {
         }
     #endif
 
-        const std::array<std::string, 5> keys = {"model name", "hardware", "processor", "cpu", "Model"};
-        while (std::getline(ss, line)) {
-            auto lower_line = to_lower_copy(line);
-            for (const auto& k : keys) {
-                std::string lk = to_lower_copy(k);
-                if (lower_line.rfind(lk, 0) == 0) {
-                    auto colon = line.find(":");
-                    if (colon != std::string::npos) {
-                        auto model = trim(line.substr(colon + 1));
-                        if (!model.empty()) return model;
-                    }
+    std::stringstream ss(get_cpuinfo_cache());
+    std::string line;
+    const std::array<std::string, 5> keys = {"model name", "hardware", "processor", "cpu", "Model"};
+    
+    while (std::getline(ss, line)) {
+        std::string lower_line = to_lower_copy(line);
+        for (const auto& k : keys) {
+            std::string lk = to_lower_copy(k);
+            if (lower_line.rfind(lk, 0) == 0) {
+                auto colon = line.find(':');
+                if (colon != std::string::npos) {
+                    auto model = trim(line.substr(colon + 1));
+                    if (!model.empty()) return model;
                 }
             }
         }
+    }
 
-        std::ifstream dt("/sys/firmware/devicetree/base/model");
-        if (dt) {
-            std::string model;
-            std::getline(dt, model);
+    std::ifstream dt("/sys/firmware/devicetree/base/model");
+    if (dt) {
+        std::string model;
+        if (std::getline(dt, model)) {
             model = trim(model);
             if (!model.empty()) return model;
         }
+    }
 
-        struct utsname buf{};
-        if (::uname(&buf) == 0) return std::string(buf.machine);
-        return "Unknown CPU";
+    struct utsname buf{};
+    if (::uname(&buf) == 0) return std::string(buf.machine);
+    return "Unknown CPU";
 }
 
 std::string SystemInfo::get_cpu_cores_freq() {
-    int cores = get_nprocs();
+    long cores = sysconf(_SC_NPROCESSORS_ONLN);
     double freq_mhz = 0.0;
 
     std::ifstream f("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
@@ -125,7 +130,7 @@ std::string SystemInfo::get_cpu_cache() {
                 if (suffix == 'K') size *= 1024;
                 else if (suffix == 'M') size *= 1024 * 1024;
             } else {
-                size *= 1024;
+                if (s.back() != 'B') size *= 1024;
             }
         } catch (...) { return s; }
 
@@ -167,17 +172,15 @@ std::string SystemInfo::get_virtualization() {
         vendor[12] = '\0';
         return std::string(vendor.data());
         #else
-        return std::string("");
+        return "";
         #endif
     };
 
     struct utsname buffer;
     if (uname(&buffer) == 0) {
         std::string release = buffer.release;
-        if (release.find("Microsoft") != std::string::npos ||
-            release.find("WSL") != std::string::npos) {
+        if (release.find("Microsoft") != std::string::npos || release.find("WSL") != std::string::npos)
             return "WSL";
-        }
     }
 
     bool hv_bit = false;
@@ -198,10 +201,8 @@ std::string SystemInfo::get_virtualization() {
         if (sig == "TCGTCGTCGTCG") return "QEMU";
     }
 
-    auto read_file = [](const std::string& p) {
-        std::ifstream f(p); std::string s; std::getline(f, s); return trim(s);
-    };
-
+    if (fs::exists("/.dockerenv") || fs::exists("/run/.containerenv")) return "Docker";
+    
     if (fs::exists("/proc/1/environ")) {
         std::ifstream f("/proc/1/environ");
         std::string env;
@@ -209,14 +210,16 @@ std::string SystemInfo::get_virtualization() {
             if (env.find("container=lxc") != std::string::npos) return "LXC";
         }
     }
-
-    if (fs::exists("/.dockerenv") || fs::exists("/run/.containerenv")) return "Docker";
+    
     if (fs::exists("/proc/user_beancounters")) return "OpenVZ";
 
-    std::string product = read_file("/sys/class/dmi/id/product_name");
-    if (product.find("KVM") != std::string::npos) return "KVM";
-    if (product.find("QEMU") != std::string::npos) return "QEMU";
-    if (product.find("VirtualBox") != std::string::npos) return "VirtualBox";
+    std::ifstream dmi("/sys/class/dmi/id/product_name");
+    std::string product;
+    if (std::getline(dmi, product)) {
+        if (product.find("KVM") != std::string::npos) return "KVM";
+        if (product.find("QEMU") != std::string::npos) return "QEMU";
+        if (product.find("VirtualBox") != std::string::npos) return "VirtualBox";
+    }
 
     return hv_bit ? "Dedicated (Virtual)" : "Dedicated";
 }
@@ -290,24 +293,24 @@ std::string SystemInfo::get_swap_details() {
         ss >> filename >> type;
 
         if (filename.find("zram") != std::string::npos) {
-            types.insert("zram");
+            types.insert("ZRAM");
         } else {
-            types.insert(type);
+            types.insert(capitalize(type));
         }
+    }
+
+    std::ifstream z("/sys/module/zswap/parameters/enabled");
+    char c;
+    if (z >> c && (c == 'Y' || c == 'y' || c == '1')) {
+        types.insert("ZSwap");
     }
 
     if (types.empty()) return "";
 
     std::string details;
     for (const auto& t : types) {
-        if (!details.empty()) details += ", ";
+        if (!details.empty()) details += " + ";
         details += t;
-    }
-
-    std::ifstream z("/sys/module/zswap/parameters/enabled");
-    char c;
-    if (z >> c && (c == 'Y' || c == 'y' || c == '1')) {
-        details += " + zswap";
     }
 
     return details;

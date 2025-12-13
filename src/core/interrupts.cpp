@@ -1,13 +1,24 @@
 #include "include/interrupts.hpp"
+#include <csignal>
+#include <stdexcept>
 
-volatile sig_atomic_t g_interrupted = 0;
+std::atomic<bool> g_interrupted{false};
 
-void signal_handler(int) noexcept {
-    g_interrupted = 1;
+void signal_handler(int) {
+    g_interrupted = true;
 }
 
 void check_interrupted() {
     if (g_interrupted) {
         throw std::runtime_error("Operation interrupted by user");
     }
+}
+
+SignalGuard::SignalGuard() {
+    struct sigaction sa = {};
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
 }

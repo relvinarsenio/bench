@@ -1,9 +1,16 @@
 #pragma once
+#include <atomic>
 
-#include <csignal>
-#include <stdexcept>
+extern std::atomic<bool> g_interrupted;
 
-extern volatile sig_atomic_t g_interrupted;
-
-void signal_handler(int) noexcept;
+void signal_handler(int signum);
 void check_interrupted();
+
+class SignalGuard {
+public:
+    SignalGuard();
+    ~SignalGuard() = default; 
+    
+    SignalGuard(const SignalGuard&) = delete;
+    SignalGuard& operator=(const SignalGuard&) = delete;
+};

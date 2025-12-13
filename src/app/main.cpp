@@ -30,6 +30,22 @@ namespace fs = std::filesystem;
 using namespace std::chrono;
 using namespace std::string_literals;
 
+class LibCurlContext {
+public:
+    LibCurlContext() {
+        if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
+            throw std::runtime_error("Failed to initialize libcurl globally");
+        }
+    }
+
+    ~LibCurlContext() {
+        curl_global_cleanup();
+    }
+
+    LibCurlContext(const LibCurlContext&) = delete;
+    LibCurlContext& operator=(const LibCurlContext&) = delete;
+};
+
 void run_app(std::string_view app_path) {
     HttpClient http;
     auto start_time = high_resolution_clock::now();
@@ -182,20 +198,10 @@ void run_app(std::string_view app_path) {
 }
 
 int main(int argc, char* argv[]) {
-    if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
-        std::println(stderr, "Failed to init libcurl");
-        return 1;
-    }
-
-    struct CurlGlobalCleaner { ~CurlGlobalCleaner() { curl_global_cleanup(); } } cleaner;
-
-    struct sigaction sa = {};
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sigaction(SIGINT, &sa, nullptr);
-    sigaction(SIGTERM, &sa, nullptr);
-
     try {
+        SignalGuard signal_guard;
+        LibCurlContext curl_context;
+        
         std::string_view app_path = (argc > 0) ? argv[0] : "bench";
         run_app(app_path);
     } catch (const std::exception& e) {

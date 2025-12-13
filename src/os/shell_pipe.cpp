@@ -1,29 +1,21 @@
 #include "include/shell_pipe.hpp"
 
 #include <array>
-#include <cerrno>
-#include <system_error>
+#include <stdexcept>
 
-#include "include/interrupts.hpp"
-
-ShellPipe::ShellPipe(const std::string& cmd) {
-    pipe_ = ::popen(cmd.c_str(), "r");
-    if (!pipe_) {
-        throw std::system_error(errno, std::generic_category(), "popen failed for: " + cmd);
-    }
+void ShellPipe::PipeCloser::operator()(FILE* fp) const {
+    if (fp) pclose(fp);
 }
 
-ShellPipe::~ShellPipe() {
-    if (pipe_) ::pclose(pipe_);
+ShellPipe::ShellPipe(const std::string& command) {
+    pipe_.reset(popen(command.c_str(), "r"));
+    if (!pipe_) throw std::runtime_error("Failed to execute command");
 }
-
-FILE* ShellPipe::get() const { return pipe_; }
 
 std::string ShellPipe::read_all() {
-    std::array<char, 256> buffer;
+    std::array<char, 3072> buffer;
     std::string result;
-    while (::fgets(buffer.data(), buffer.size(), pipe_) != nullptr) {
-        check_interrupted();
+    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe_.get()) != nullptr) {
         result += buffer.data();
     }
     return result;
