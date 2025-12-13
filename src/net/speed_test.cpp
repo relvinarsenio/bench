@@ -116,15 +116,15 @@ void SpeedTest::install() {
 
     {
         FileRemover cleaner(tgz_path_);
-
         http_.download(url, tgz_path_.string());
-
         fs::create_directories(cli_dir_);
-        std::string tar_cmd = std::format("tar zxf {} -C {} 2>&1", tgz_path_.string(), cli_dir_.string());
+
+        std::vector<std::string> tar_args = {
+            "tar", "zxf", tgz_path_.string(), "-C", cli_dir_.string()
+        };
         
-        ShellPipe pipe(tar_cmd);
+        ShellPipe pipe(tar_args);
         pipe.read_all();
-        
     }
 
     if (!fs::exists(cli_path_)) throw std::runtime_error("Failed to extract speedtest-cli");
@@ -149,17 +149,24 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
     for (const auto& node : nodes) {
         if (g_interrupted) break;
 
-        std::string cmd = cli_path_.string() + " -f csv --accept-license --accept-gdpr";
         SpinnerScope spinner(spinner_cb, node.name);
-        if (!node.id.empty()) cmd += " --server-id=" + node.id;
-        cmd += " 2>&1";
+
+        std::vector<std::string> cmd_args = {
+            cli_path_.string(),
+            "-f", "csv",
+            "--accept-license", "--accept-gdpr"
+        };
+
+        if (!node.id.empty()) {
+            cmd_args.push_back("--server-id=" + node.id);
+        }
 
         SpeedEntryResult entry;
         entry.server_id = node.id;
         entry.node_name = node.name;
 
         try {
-            ShellPipe pipe(cmd);
+            ShellPipe pipe(cmd_args);
             std::string output = pipe.read_all();
             std::stringstream ss(output);
             std::string line;
@@ -197,30 +204,17 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
                 if (line.find(',') != std::string::npos && line.find('"') != std::string::npos) {
                     auto cols = parse_csv_line(line);
-
                     if (cols.size() >= 7) {
                         try {
                             double dl_bytes = std::stod(cols[5]);
                             double ul_bytes = std::stod(cols[6]);
                             double lat_val = std::stod(cols[2]);
-
                             std::string loss_raw = cols[4];
-                            std::string loss_formatted;
-                            try {
-                                double loss_val = std::stod(loss_raw);
-                                loss_formatted = std::format("{:.2f} %", loss_val);
-                            } catch (...) {
-                                if (loss_raw == "N/A" || loss_raw.empty()) loss_formatted = "-";
-                                else loss_formatted = loss_raw;
-                            }
 
-                            double dl_mbps = (dl_bytes * 8.0) / 1000000.0;
-                            double ul_mbps = (ul_bytes * 8.0) / 1000000.0;
-
-                            entry.upload_mbps = ul_mbps;
-                            entry.download_mbps = dl_mbps;
+                            entry.upload_mbps = (ul_bytes * 8.0) / 1000000.0;
+                            entry.download_mbps = (dl_bytes * 8.0) / 1000000.0;
                             entry.latency_ms = lat_val;
-                            entry.loss = loss_formatted;
+                            entry.loss = (loss_raw == "N/A" || loss_raw.empty()) ? "-" : std::format("{:.2f} %", std::stod(loss_raw));
                             entry.success = true;
 
                             success = true;

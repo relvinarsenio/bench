@@ -1,22 +1,88 @@
 #include "include/shell_pipe.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cerrno>
+#include <cstring>
+#include <format>
 #include <stdexcept>
+#include <system_error>
+#include <vector>
 
-void ShellPipe::PipeCloser::operator()(FILE* fp) const {
-    if (fp) pclose(fp);
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+ShellPipe::ShellPipe(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        throw std::invalid_argument("ShellPipe: Empty argument list");
+    }
+
+    int pipe_fds[2];
+    if (::pipe(pipe_fds) == -1) {
+        throw std::system_error(errno, std::generic_category(), "Failed to create pipe");
+    }
+
+    pid_t pid = ::fork();
+    if (pid == -1) {
+        ::close(pipe_fds[0]);
+        ::close(pipe_fds[1]);
+        throw std::system_error(errno, std::generic_category(), "Failed to fork process");
+    }
+
+    if (pid == 0) {        
+        ::dup2(pipe_fds[1], STDOUT_FILENO);
+        ::dup2(pipe_fds[1], STDERR_FILENO);
+
+        ::close(pipe_fds[0]);
+        ::close(pipe_fds[1]);
+
+        std::vector<char*> c_args;
+        c_args.reserve(args.size() + 1);
+        for (const auto& arg : args) {
+            c_args.push_back(const_cast<char*>(arg.c_str()));
+        }
+        c_args.push_back(nullptr);
+
+        ::execvp(c_args[0], c_args.data());
+
+        std::string err_msg = std::format("Exec failed: {}\n", std::strerror(errno));
+        
+        [[maybe_unused]] ssize_t result = ::write(STDOUT_FILENO, err_msg.data(), err_msg.size());
+        
+        ::_exit(127);
+    }
+
+    ::close(pipe_fds[1]);
+    read_fd_ = pipe_fds[0];
+    pid_ = pid;
 }
 
-ShellPipe::ShellPipe(const std::string& command) {
-    pipe_.reset(popen(command.c_str(), "r"));
-    if (!pipe_) throw std::runtime_error("Failed to execute command");
+ShellPipe::~ShellPipe() {
+    if (read_fd_ != -1) {
+        ::close(read_fd_);
+    }
+    if (pid_ != -1) {
+        ::waitpid(pid_, nullptr, WNOHANG);
+    }
 }
 
 std::string ShellPipe::read_all() {
+    std::string output;
     std::array<char, 4096> buffer;
-    std::string result;
-    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe_.get()) != nullptr) {
-        result += buffer.data();
+    ssize_t bytes_read;
+
+    while ((bytes_read = ::read(read_fd_, buffer.data(), buffer.size())) > 0) {
+        output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
     }
-    return result;
+
+    if (bytes_read == -1) {
+        throw std::system_error(errno, std::generic_category(), "Failed to read from pipe");
+    }
+
+    int status;
+    ::waitpid(pid_, &status, 0);
+    pid_ = -1;
+
+    return output;
 }

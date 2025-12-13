@@ -1,17 +1,19 @@
 #pragma once
 
-#include <cstdio>
-#include <memory>
 #include <string>
+#include <vector>
 
 class ShellPipe {
-    struct PipeCloser {
-        void operator()(FILE* fp) const;
-    };
-
-    std::unique_ptr<FILE, PipeCloser> pipe_;
+    int read_fd_ = -1;
+    int pid_ = -1;
 
 public:
-    explicit ShellPipe(const std::string& command);
+    explicit ShellPipe(const std::vector<std::string>& args);
+    
+    ~ShellPipe();
+
+    ShellPipe(const ShellPipe&) = delete;
+    ShellPipe& operator=(const ShellPipe&) = delete;
+
     std::string read_all();
 };
