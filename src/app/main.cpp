@@ -121,6 +121,8 @@ void run_app(std::string_view app_path) {
         std::string org = extract("org");
         if (!org.empty()) std::println(" {:<20} : {}", "ISP", Color::colorize(org, Color::CYAN));
         std::println(" {:<20} : {} / {}", "Location", Color::colorize(extract("city"), Color::CYAN), Color::colorize(extract("country"), Color::CYAN));
+        std::string region = extract("region");
+        if (!region.empty()) std::println(" {:<20} : {}", "Region", Color::colorize(region, Color::CYAN));
     } catch (const std::exception&) {
         std::println(" {:<20} : {}", "IP Info", Color::colorize("Failed to fetch", Color::RED));
     }
