@@ -1,10 +1,11 @@
 #include "include/interrupts.hpp"
+
 #include <csignal>
 #include <stdexcept>
 
 std::atomic<bool> g_interrupted{false};
 
-void signal_handler(int) {
+void signal_handler(int) noexcept {
     g_interrupted = true;
 }
 

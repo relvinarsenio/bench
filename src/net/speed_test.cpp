@@ -19,7 +19,25 @@
 #include "include/shell_pipe.hpp"
 #include "include/utils.hpp"
 
+namespace fs = std::filesystem;
+
 namespace {
+
+class FileRemover {
+    fs::path path_;
+public:
+    explicit FileRemover(fs::path p) : path_(std::move(p)) {}
+    
+    ~FileRemover() {
+        std::error_code ec;
+        if (fs::exists(path_, ec)) {
+            fs::remove(path_, ec);
+        }
+    }
+    
+    FileRemover(const FileRemover&) = delete;
+    FileRemover& operator=(const FileRemover&) = delete;
+};
 
 class SpinnerScope {
     const SpinnerCallback& cb_;
@@ -51,8 +69,6 @@ std::string sanitize_error(std::string msg) {
 }
 
 }
-
-namespace fs = std::filesystem;
 
 SpeedTest::SpeedTest(HttpClient& h) : http_(h) {
     base_dir_ = get_exe_dir();
@@ -92,23 +108,27 @@ std::vector<std::string> SpeedTest::parse_csv_line(const std::string& line) {
 
 void SpeedTest::install() {
     std::error_code ec;
-    fs::remove(tgz_path_, ec);
-    fs::remove_all(cli_dir_, ec);
+    if (fs::exists(tgz_path_, ec)) fs::remove(tgz_path_, ec);
+    if (fs::exists(cli_dir_, ec)) fs::remove_all(cli_dir_, ec);
 
     std::println("Downloading Speedtest CLI...");
     std::string url = std::format("https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{}.tgz", get_arch());
 
-    http_.download(url, tgz_path_.string());
+    {
+        FileRemover cleaner(tgz_path_);
 
-    fs::create_directories(cli_dir_);
-    std::string tar_cmd = std::format("tar zxf {} -C {} 2>&1", tgz_path_.string(), cli_dir_.string());
-    ShellPipe pipe(tar_cmd);
-    pipe.read_all();
+        http_.download(url, tgz_path_.string());
+
+        fs::create_directories(cli_dir_);
+        std::string tar_cmd = std::format("tar zxf {} -C {} 2>&1", tgz_path_.string(), cli_dir_.string());
+        
+        ShellPipe pipe(tar_cmd);
+        pipe.read_all();
+        
+    }
 
     if (!fs::exists(cli_path_)) throw std::runtime_error("Failed to extract speedtest-cli");
-
     fs::permissions(cli_path_, fs::perms::owner_all, fs::perm_options::add);
-    fs::remove(tgz_path_);
 }
 
 SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
