@@ -1,0 +1,98 @@
+#include "include/shell_pipe.hpp"
+#include "include/interrupts.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cerrno>
+#include <cstring>
+#include <vector>
+
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <system_error>
+#include <unistd.h>
+
+#include "include/interrupts.hpp"
+
+ShellPipe::ShellPipe(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        throw std::invalid_argument("ShellPipe: Empty argument list");
+    }
+
+    std::vector<char*> c_args;
+    c_args.reserve(args.size() + 1);
+    for (const auto& arg : args) {
+        c_args.push_back(const_cast<char*>(arg.c_str()));
+    }
+    c_args.push_back(nullptr);
+
+    int pipe_fds[2];
+    if (::pipe(pipe_fds) == -1) {
+        throw std::system_error(errno, std::generic_category(), "Failed to create pipe");
+    }
+
+    pid_t pid = ::fork();
+    if (pid == -1) {
+        ::close(pipe_fds[0]);
+        ::close(pipe_fds[1]);
+        throw std::system_error(errno, std::generic_category(), "Failed to fork process");
+    }
+
+    if (pid == 0) {        
+        ::dup2(pipe_fds[1], STDOUT_FILENO);
+        ::dup2(pipe_fds[1], STDERR_FILENO);
+
+        ::close(pipe_fds[0]);
+        ::close(pipe_fds[1]);
+
+        ::execvp(c_args[0], c_args.data());
+
+        const char* msg = "Error: execvp failed (binary not found?)\n";
+        [[maybe_unused]] auto val = ::write(STDOUT_FILENO, msg, std::strlen(msg));
+        
+        ::_exit(127);
+    }
+
+    ::close(pipe_fds[1]);
+    read_fd_ = pipe_fds[0];
+    pid_ = pid;
+}
+
+ShellPipe::~ShellPipe() {
+    if (read_fd_ != -1) {
+        ::close(read_fd_);
+    }
+    if (pid_ != -1) {
+        ::waitpid(pid_, nullptr, WNOHANG);
+    }
+}
+
+std::string ShellPipe::read_all() {
+    std::string output;
+    std::array<char, 4096> buffer;
+    ssize_t bytes_read;
+
+    while (true) {
+        if (g_interrupted) break;
+
+        bytes_read = ::read(read_fd_, buffer.data(), buffer.size());
+        
+        if (bytes_read > 0) {
+            output.append(buffer.data(), static_cast<std::size_t>(bytes_read));
+        } else if (bytes_read == 0) {
+            break;
+        } else {
+            if (errno == EINTR) {
+                if (g_interrupted) break;
+                continue;
+            }
+            throw std::system_error(errno, std::generic_category(), "Failed to read from pipe");
+        }
+    }
+
+    int status;
+    ::waitpid(pid_, &status, 0);
+    pid_ = -1;
+
+    return output;
+}
