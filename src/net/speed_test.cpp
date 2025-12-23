@@ -41,13 +41,25 @@ public:
     }
 };
 
-std::string sanitize_error(std::string msg) {
+std::string sanitize_error(std::string_view msg) {
     auto nl = msg.find('\n');
-    if (nl != std::string::npos) msg = msg.substr(0, nl);
-    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) msg.pop_back();
-    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
-    if (msg.starts_with("Error: ")) msg = msg.substr(7);
-    return msg;
+    if (nl != std::string_view::npos) {
+        msg = msg.substr(0, nl);
+    }
+
+    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) {
+        msg.remove_suffix(1);
+    }
+
+    while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) {
+        msg.remove_prefix(1);
+    }
+    
+    if (msg.starts_with("Error: ")) {
+        msg.remove_prefix(7);
+    }
+    
+    return std::string(msg);
 }
 
 }

@@ -13,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <string_view>
 
 #if defined(__i386__) || defined(__x86_64__)
 #include <cpuid.h>
@@ -25,10 +26,12 @@
 namespace fs = std::filesystem;
 
 namespace {
-    std::string capitalize(std::string s) {
-        if (!s.empty()) s[0] = static_cast<char>(std::toupper(s[0]));
-        if (s == "Zram") return "ZRAM";
-        return s;
+    std::string capitalize(std::string_view s) {
+        if (s.empty()) return {};
+        std::string ret(s);
+        ret[0] = static_cast<char>(std::toupper(ret[0]));
+        if (ret == "Zram") return "ZRAM";
+        return ret;
     }
 
     std::string to_lower_copy(std::string_view s) {
@@ -313,7 +316,6 @@ std::vector<SwapEntry> SystemInfo::get_swaps() {
         }
     }
 
-    // 2. Cek ZSwap (Modul kernel terpisah)
     std::ifstream z("/sys/module/zswap/parameters/enabled");
     char c;
     if (z >> c && (c == 'Y' || c == 'y' || c == '1')) {
