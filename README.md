@@ -80,9 +80,9 @@ Running I/O Test (1GB File)...
  I/O Speed (Average) : 3201.6 MB/s
 ------------------------------------------------------------------------------
 Downloading Speedtest CLI...
- Node Name              Upload             Download           Latency     Loss    
- Speedtest.net (Auto)   22.92 Mbps         78.98 Mbps         32.00 ms    0.00 %  
- Singapore, SG          22.43 Mbps         78.06 Mbps         29.80 ms    0.00 %  
+ Node Name              Download          Upload            Latency     Loss    
+ Speedtest.net (Auto)   77.49 Mbps        22.86 Mbps        25.63 ms    0.00 %  
+ Singapore, SG          78.06 Mbps        22.43 Mbps        29.80 ms    0.00 %  
 ------------------------------------------------------------------------------
  Finished in        : 234 sec
 

@@ -59,8 +59,15 @@ void render_disk_suite(const DiskSuiteResult& suite) {
     }
 }
 
+std::string format_speed(double mbps) {
+    if (mbps >= 1000.0) {
+        return std::format("{:.2f} Gbps", mbps / 1000.0);
+    }
+    return std::format("{:.2f} Mbps", mbps);
+}
+
 void render_speed_results(const SpeedTestResult& result) {
-    std::println("{:<24}{:<18}{:<18}{:<12}{:<8}", " Node Name", "Upload", "Download", "Latency", "Loss");
+    std::println("{:<24}{:<18}{:<18}{:<12}{:<8}", " Node Name", "Download", "Upload", "Latency", "Loss");
     for (const auto& entry : result.entries) {
         if (!entry.success) {
             std::string err = entry.error;
@@ -71,8 +78,8 @@ void render_speed_results(const SpeedTestResult& result) {
         }
         std::print("{}{: <24}{}{:<18}{}{:<18}{}{:<12}{}{:<8}{}\n",
             Color::YELLOW, " " + entry.node_name,
-            Color::GREEN, std::format("{:.2f} Mbps", entry.upload_mbps),
-            Color::RED,   std::format("{:.2f} Mbps", entry.download_mbps),
+            Color::GREEN, format_speed(entry.download_mbps),
+            Color::RED,   format_speed(entry.upload_mbps),
             Color::CYAN,  std::format("{:.2f} ms", entry.latency_ms),
             Color::RED,   entry.loss.empty() ? "-" : entry.loss,
             Color::RESET);
