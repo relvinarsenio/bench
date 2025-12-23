@@ -38,7 +38,7 @@ ShellPipe::ShellPipe(const std::vector<std::string>& args) {
         throw std::system_error(errno, std::generic_category(), "Failed to fork process");
     }
 
-    if (pid == 0) {        
+    if (pid == 0) {
         ::dup2(pipe_fds[1], STDOUT_FILENO);
         ::dup2(pipe_fds[1], STDERR_FILENO);
 
@@ -47,7 +47,7 @@ ShellPipe::ShellPipe(const std::vector<std::string>& args) {
 
         ::execvp(c_args[0], c_args.data());
 
-        const char* msg = "Error: execvp failed (binary not found?)\n";
+        const char* msg = "Error: execvp failed\n";
         [[maybe_unused]] auto val = ::write(STDOUT_FILENO, msg, std::strlen(msg));
         
         ::_exit(127);

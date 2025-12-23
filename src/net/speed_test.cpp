@@ -25,22 +25,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-class FileRemover {
-    fs::path path_;
-public:
-    explicit FileRemover(fs::path p) : path_(std::move(p)) {}
-    
-    ~FileRemover() {
-        std::error_code ec;
-        if (fs::exists(path_, ec)) {
-            fs::remove(path_, ec);
-        }
-    }
-    
-    FileRemover(const FileRemover&) = delete;
-    FileRemover& operator=(const FileRemover&) = delete;
-};
-
 class SpinnerScope {
     const SpinnerCallback& cb_;
     std::string_view label_;
@@ -62,20 +46,38 @@ std::string sanitize_error(std::string msg) {
     if (nl != std::string::npos) msg = msg.substr(0, nl);
     while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.back()))) msg.pop_back();
     while (!msg.empty() && std::isspace(static_cast<unsigned char>(msg.front()))) msg.erase(msg.begin());
-    
     if (msg.starts_with("Error: ")) msg = msg.substr(7);
-    
     return msg;
 }
 
 }
 
 SpeedTest::SpeedTest(HttpClient& h) : http_(h) {
-    base_dir_ = get_exe_dir();
-    std::filesystem::path cli_rel(Config::SPEEDTEST_CLI_PATH);
+    fs::path temp_dir;
+    try {
+        temp_dir = fs::temp_directory_path();
+    } catch (...) {
+        temp_dir = "/tmp"; 
+    }
+
+    std::string unique_folder = std::format("bench_tools_{}", getpid());
+    base_dir_ = temp_dir / unique_folder;
+
+    std::error_code ec;
+    if (fs::exists(base_dir_, ec)) fs::remove_all(base_dir_, ec);
+    fs::create_directories(base_dir_);
+
+    fs::path cli_rel(Config::SPEEDTEST_CLI_PATH);
     cli_dir_ = base_dir_ / cli_rel.parent_path();
     cli_path_ = base_dir_ / cli_rel;
     tgz_path_ = base_dir_ / Config::SPEEDTEST_TGZ;
+}
+
+SpeedTest::~SpeedTest() {
+    std::error_code ec;
+    if (fs::exists(base_dir_, ec)) {
+        fs::remove_all(base_dir_, ec);
+    }
 }
 
 std::string SpeedTest::get_arch() {
@@ -89,25 +91,18 @@ std::string SpeedTest::get_arch() {
 }
 
 void SpeedTest::install() {
-    std::error_code ec;
-    if (fs::exists(tgz_path_, ec)) fs::remove(tgz_path_, ec);
-    if (fs::exists(cli_dir_, ec)) fs::remove_all(cli_dir_, ec);
-
     std::println("Downloading Speedtest CLI...");
     std::string url = std::format("https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{}.tgz", get_arch());
 
-    {
-        FileRemover cleaner(tgz_path_);
-        http_.download(url, tgz_path_.string());
-        fs::create_directories(cli_dir_);
+    http_.download(url, tgz_path_.string());
+    fs::create_directories(cli_dir_);
 
-        std::vector<std::string> tar_args = {
-            "tar", "zxf", tgz_path_.string(), "-C", cli_dir_.string()
-        };
-        
-        ShellPipe pipe(tar_args);
-        pipe.read_all();
-    }
+    std::vector<std::string> tar_args = {
+        "tar", "zxf", tgz_path_.string(), "-C", cli_dir_.string()
+    };
+    
+    ShellPipe pipe(tar_args);
+    pipe.read_all();
 
     if (!fs::exists(cli_path_)) throw std::runtime_error("Failed to extract speedtest-cli");
     fs::permissions(cli_path_, fs::perms::owner_all, fs::perm_options::add);
@@ -167,21 +162,16 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
                 try {
                     auto j = json::parse(line);
-
                     std::string type = j.value("type", "");
 
                     if (type == "result") {
-                        
                         double dl_bytes = j["download"].value("bandwidth", 0.0);
                         double ul_bytes = j["upload"].value("bandwidth", 0.0);
                         
                         entry.download_mbps = (dl_bytes * 8.0) / 1000000.0;
                         entry.upload_mbps = (ul_bytes * 8.0) / 1000000.0;
-                        
-                        // Latency & Jitter
                         entry.latency_ms = j["ping"].value("latency", 0.0);
                         
-                        // Packet Loss (bisa null/gak ada)
                         if (j.contains("packetLoss")) {
                             double loss = j.value("packetLoss", 0.0);
                             entry.loss = std::format("{:.2f} %", loss);
@@ -191,13 +181,12 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
                         entry.success = true;
                         found_result = true;
-                        break;
+                        break; 
                     }
                     else if (type == "log") {
                         std::string level = j.value("level", "");
                         if (level == "error") {
                             std::string msg = j.value("message", "Unknown error");
-                            
                             if (msg.find("Limit reached") != std::string::npos) {
                                 entry.rate_limited = true;
                                 entry.error = "Rate Limit Reached";
