@@ -11,6 +11,8 @@
 
 namespace {
 
+constexpr auto kUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 struct CurlSlistDeleter {
     void operator()(struct curl_slist* list) const noexcept {
         if (list) curl_slist_free_all(list);
@@ -23,7 +25,6 @@ class CurlHeaders {
 public:
     void add(const std::string& header) {
         auto new_head = curl_slist_append(list_.get(), header.c_str());
-
         if (new_head && !list_) {
             list_.reset(new_head);
         }
@@ -31,6 +32,25 @@ public:
 
     struct curl_slist* get() const { return list_.get(); }
 };
+
+void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
+    headers.add("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+    headers.add("Accept-Language: en-US,en;q=0.9");
+    headers.add("Cache-Control: max-age=0");
+    headers.add("Connection: keep-alive");
+    headers.add("Sec-Ch-Ua: \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"");
+    headers.add("Sec-Ch-Ua-Mobile: ?0");
+    headers.add("Sec-Ch-Ua-Platform: \"Windows\"");
+    headers.add("Sec-Fetch-Dest: document");
+    headers.add("Sec-Fetch-Mode: navigate");
+    headers.add("Sec-Fetch-Site: none");
+    headers.add("Sec-Fetch-User: ?1");
+    headers.add("Upgrade-Insecure-Requests: 1");
+
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, kUserAgent);
+    curl_easy_setopt(handle, CURLOPT_REFERER, "https://www.google.com/");
+    curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br");
+}
 
 }
 
@@ -61,18 +81,15 @@ std::string HttpClient::get(const std::string& url) {
     curl_easy_reset(handle_.get());
 
     std::string response;
-    
     CurlHeaders headers;
-    headers.add("Accept-Language: en-US,en;q=0.9");
-    headers.add("Accept: application/json, text/javascript, */*; q=0.01");
+    
+    setup_browser_impersonation(handle_.get(), headers);
 
     curl_easy_setopt(handle_.get(), CURLOPT_URL, url.c_str());
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEFUNCTION, write_string);
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
-    curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-    curl_easy_setopt(handle_.get(), CURLOPT_ACCEPT_ENCODING, "");
-    curl_easy_setopt(handle_.get(), CURLOPT_REFERER, "https://www.google.com/");
+    
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_TCP_KEEPALIVE, 1L);
@@ -96,14 +113,20 @@ void HttpClient::download(const std::string& url, const std::string& filepath) {
     curl_easy_reset(handle_.get());
 
     std::ofstream outfile(filepath, std::ios::binary);
-    if (!outfile) throw std::system_error(errno, std::generic_category(), "Failed to create file");
+    if (!outfile) {
+        throw std::runtime_error(std::format("Cannot save file '{}': {}", 
+            filepath, std::system_category().message(errno)));
+    }
+
+    CurlHeaders headers;
+    
+    setup_browser_impersonation(handle_.get(), headers);
 
     curl_easy_setopt(handle_.get(), CURLOPT_URL, url.c_str());
-    curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-    curl_easy_setopt(handle_.get(), CURLOPT_ACCEPT_ENCODING, "");
-    curl_easy_setopt(handle_.get(), CURLOPT_REFERER, "https://www.google.com/");
+    curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEFUNCTION, write_file);
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &outfile);
+    
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 60L);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
 
@@ -129,7 +152,8 @@ bool HttpClient::check_connectivity(const std::string& host) {
         
         curl_easy_setopt(handle_.get(), CURLOPT_URL, ("http://" + host).c_str());
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
-        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 3L);
+        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 5L);
+        curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, kUserAgent);
         
         return curl_easy_perform(handle_.get()) == CURLE_OK;
     } catch (...) {

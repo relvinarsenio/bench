@@ -47,12 +47,12 @@ Karena menggunakan standar C++ terbaru, pastikan environment kamu mendukung:
 
 ```text
 ------------------------------------------------------------------------------
- A Bench Script (Edition v6.9.6)
+ A Bench Script (C++ Edition v6.9.6)
  Usage : ./bench
 ------------------------------------------------------------------------------
  -> CPU & Hardware
- CPU Model            : AMD Ryzen 5 7535HS with Radeon Graphics        
- CPU Cores            : 4 @ 3773.8 MHz
+ CPU Model            : AMD Ryzen 5 7535HS with Radeon Graphics
+ CPU Cores            : 4 @ 3824.4 MHz
  CPU Cache            : 16 MB
  AES-NI               : ✓ Enabled
  VM-x/AMD-V           : ✗ Disabled
@@ -61,31 +61,41 @@ Karena menggunakan standar C++ terbaru, pastikan environment kamu mendukung:
  OS                   : Oracle Linux Server 10.1
  Arch                 : x86_64 (64 Bit)
  Kernel               : 6.12.0-106.55.4.2.el10uek.x86_64
+ TCP CC               : bbr
  Virtualization       : Hyper-V
+ System Uptime        : 0 days, 2 hour 22 min
+ Load Average         : 0.35, 0.18, 0.13
 
  -> Storage & Memory
- Total Disk           : 60.2 GB (8.3 GB Used)
- Total Mem            : 2.5 GB (1.5 GB Used)
- Total Swap           : 3.2 GB (412.5 MB Used)
-    -> Partition      : 3.2 GB (412.5 MB Used) (/dev/dm-1)
-    -> ZSwap          : Enabled
+ Total Disk           : 60.2 GB (8.4 GB Used)
+ Total Mem            : 2.5 GB (1.6 GB Used)
+ Total Swap           : 3.2 GB (1004.3 MB Used)
+   -> Partition        : 3.2 GB (1004.3 MB Used) (/dev/sda2)
+   -> ZSwap            : Enabled
 
  -> Network
  IPv4/IPv6            : ✓ Online / ✗ Offline
- ISP                  : AS7713 PT Telekomunikasi Indonesia
- Location             : Bandar Lampung / Indonesia
-
+ ISP                  : AS7713 PT TELKOM INDONESIA
+ Location             : Bandar Lampung / ID
+ Region               : Lampung
 ------------------------------------------------------------------------------
 Running I/O Test (1GB File)...
- I/O Speed (Average) : 3201.6 MB/s
+ I/O Speed (Run #1) : 2197.1 MB/s
+ I/O Speed (Run #2) : 2573.6 MB/s
+ I/O Speed (Run #3) : 4554.3 MB/s
+ I/O Speed (Average) : 3108.3 MB/s
 ------------------------------------------------------------------------------
 Downloading Speedtest CLI...
  Node Name              Download          Upload            Latency     Loss    
- Speedtest.net (Auto)   77.49 Mbps        22.86 Mbps        25.63 ms    0.00 %  
- Singapore, SG          78.06 Mbps        22.43 Mbps        29.80 ms    0.00 %  
+ Speedtest.net (Auto)   76.66 Mbps        21.53 Mbps        23.88 ms    6.19 %  
+ Singapore, SG          69.49 Mbps        22.32 Mbps        29.71 ms    0.00 %  
+ Los Angeles, US        36.35 Mbps        28.20 Mbps        197.47 ms   0.00 %  
+ Montreal, CA           42.75 Mbps        21.44 Mbps        273.46 ms   0.00 %  
+ Paris, FR              72.95 Mbps        22.23 Mbps        184.56 ms   0.00 %  
+ Amsterdam, NL          Error: Cannot open socket
+ Melbourne, AU          78.91 Mbps        21.80 Mbps        280.85 ms   0.00 %  
 ------------------------------------------------------------------------------
- Finished in        : 234 sec
-
+ Finished in        : 213 sec
 ```
 
 ## ⚖️ License

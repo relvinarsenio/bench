@@ -114,16 +114,23 @@ void run_app(std::string_view app_path) {
     );
 
     try {
-        std::string json_str = http.get("http://ip-api.com/json");
+        std::string json_str = http.get("https://speed.cloudflare.com/meta");
         auto data = json::parse(json_str);
 
-        std::string org = data.value("as", "");
+        int asn = data.value("asn", 0); 
+        std::string org_name = data.value("asOrganization", ""); 
+        
         std::string city = data.value("city", "-");
         std::string country = data.value("country", "-");
-        std::string region = data.value("regionName", "");
+        std::string region = data.value("region", "");
 
-        if (!org.empty()) {
-            std::println(" {:<20} : {}", "ISP", Color::colorize(org, Color::CYAN));
+        std::string display_isp = org_name;
+        if (asn != 0 && !org_name.empty()) {
+            display_isp = std::format("AS{} {}", asn, org_name);
+        }
+
+        if (!display_isp.empty()) {
+            std::println(" {:<20} : {}", "ISP", Color::colorize(display_isp, Color::CYAN));
         }
 
         std::println(" {:<20} : {} / {}", "Location",

@@ -164,10 +164,12 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
             std::stringstream ss(output);
             std::string line;
+            std::string last_raw_output;
             bool found_result = false;
 
             while(std::getline(ss, line)) {
                 if (trim(line).empty()) continue;
+                last_raw_output = line;
 
                 if (line.find("Limit reached") != std::string::npos || 
                     line.find("Too many requests") != std::string::npos) {
@@ -179,6 +181,16 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
                 try {
                     auto j = json::parse(line);
+                    
+                    if (j.contains("error")) {
+                        if (j["error"].is_string()) {
+                            entry.error = sanitize_error(j["error"].get<std::string>());
+                        } else {
+                            entry.error = "Unknown CLI Error";
+                        }
+                        continue; 
+                    }
+
                     std::string type = j.value("type", "");
 
                     if (type == "result") {
@@ -223,9 +235,13 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
             if (!found_result && !entry.success && entry.error.empty()) {
                 if (result.rate_limited) {
-                     // Ignore, already marked as rate limited
+                     
+                } else if (!last_raw_output.empty()) {
+                     std::string clean_msg = trim(last_raw_output);
+                     if (clean_msg.length() > 50) clean_msg = clean_msg.substr(0, 47) + "...";
+                     entry.error = "CLI Error: " + clean_msg;
                 } else {
-                     entry.error = "No Result Data (JSON Parse Failed?)";
+                     entry.error = "No Result Data (Empty Output)";
                 }
             }
             
