@@ -11,6 +11,7 @@
 #include <span>
 #include <stop_token>
 #include <system_error>
+#include <stdexcept>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -40,6 +41,32 @@ std::unique_ptr<std::byte[], AlignedDelete> make_aligned_buffer(std::size_t size
     );
 }
 
+std::string get_error_message(int err, std::string_view operation) {
+    switch (err) {
+        case ENOSPC: 
+            return "Storage capacity limit reached (Disk Full)";
+        case EDQUOT: 
+            return "User disk quota exceeded";
+        case EIO:    
+            return "Critical I/O error (Hardware failure suspected)";
+        case EROFS:  
+            return "File system is Read-Only";
+        case EACCES: 
+        case EPERM:
+            if (operation == "create") 
+                return "Permission denied. Cannot create file in this directory.";
+            else 
+                return "Permission denied during write operation.";
+        case EINVAL:
+            if (operation == "create")
+                return "Invalid arguments (O_DIRECT not supported on this filesystem?)";
+            else
+                return "Invalid argument provided";
+        default:     
+            return std::format("Operation '{}' failed: {}", operation, std::system_category().message(err));
+    }
+}
+
 }
 
 DiskRunResult DiskBenchmark::run_write_test(
@@ -61,6 +88,7 @@ DiskRunResult DiskBenchmark::run_write_test(
     #endif
 
     int fd_raw = ::open(filename.c_str(), flags, 0644);
+    
     if (fd_raw < 0 && errno == EINVAL) {
          #ifdef O_DIRECT
          flags &= ~O_DIRECT;
@@ -69,8 +97,7 @@ DiskRunResult DiskBenchmark::run_write_test(
     }
 
     if (fd_raw < 0) {
-        throw std::system_error(errno, std::generic_category(),
-            std::format("Failed to open file for benchmark: {}", filename));
+        throw std::runtime_error(get_error_message(errno, "create"));
     }
 
     FileDescriptor fd(fd_raw);
@@ -81,13 +108,15 @@ DiskRunResult DiskBenchmark::run_write_test(
     for (size_t i = 0; i < blocks; ++i) {
         check_interrupted();
         if (stop.stop_requested()) {
-            throw std::runtime_error("Operation interrupted");
+            throw std::runtime_error("Operation interrupted by user request.");
         }
         
         ssize_t written = ::write(fd.get(), buffer.get(), block_size);
+        
         if (written != static_cast<ssize_t>(block_size)) {
-            throw std::system_error(errno, std::generic_category(), "Disk write failed");
+            throw std::runtime_error("Benchmark failed: " + get_error_message(errno, "write"));
         }
+
         if (progress_cb && i % 2 == 0) progress_cb(i + 1, blocks, label);
     }
     if (progress_cb) progress_cb(blocks, blocks, label);

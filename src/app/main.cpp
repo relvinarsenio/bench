@@ -141,35 +141,49 @@ void run_app(std::string_view app_path) {
     print_line();
 
     std::vector<DiskRunResult> disk_runs;
-    disk_runs.reserve(3);
-    for(int i=1; i<=3; ++i) {
-        std::string label = std::format(" I/O Speed (Run #{}) : ", i);
-        auto progress_cb = [&](std::size_t current, std::size_t total, std::string_view lbl) {
-            int percent = static_cast<int>((current * 100) / total);
-            std::print("\r{} [{:3}%] ", lbl, percent);
+    try {
+        disk_runs.reserve(3);
+        std::println("Running I/O Test (1GB File)...");
+
+        for(int i=1; i<=3; ++i) {
+            std::string label = std::format(" I/O Speed (Run #{}) : ", i);
+            auto progress_cb = [&](std::size_t current, std::size_t total, std::string_view lbl) {
+                int percent = static_cast<int>((current * 100) / total);
+                std::print("\r{} [{:3}%] ", lbl, percent);
+                std::cout << std::flush;
+            };
+
+            auto run = DiskBenchmark::run_write_test(1024, label, progress_cb);
+            std::print("\r{}\r", std::string(label.size() + 6, ' '));
             std::cout << std::flush;
-        };
+            
+            std::println("{}{}", run.label, Color::colorize(std::format("{:.1f} MB/s", run.mbps), Color::YELLOW));
+            
+            disk_runs.push_back(run);
+        }
 
-        auto run = DiskBenchmark::run_write_test(1024, label, progress_cb);
-        std::print("\r{}\r", std::string(label.size() + 6, ' '));
-        std::cout << std::flush;
-        disk_runs.push_back(run);
+        double total_speed = 0.0;
+        for (const auto& r : disk_runs) total_speed += r.mbps;
+        double avg = disk_runs.empty() ? 0.0 : total_speed / static_cast<double>(disk_runs.size());
+        
+        std::println(" I/O Speed (Average) : {}", Color::colorize(std::format("{:.1f} MB/s", avg), Color::YELLOW));
+
+    } catch (const std::exception& e) {
+        std::println("\r{}[!] Disk Benchmark Skipped: {}{}", Color::RED, e.what(), Color::RESET);
     }
-
-    double total_speed = 0.0;
-    for (const auto& r : disk_runs) total_speed += r.mbps;
-    double avg = disk_runs.empty() ? 0.0 : total_speed / static_cast<double>(disk_runs.size());
-    DiskSuiteResult suite{std::move(disk_runs), avg};
-
-    CliRenderer::render_disk_suite(suite);
+    // ---------------------------------------------
 
     print_line();
 
     SpeedTest st(http);
-    st.install();
-    auto spinner_cb = CliRenderer::make_spinner_callback();
-    auto speed_result = st.run(spinner_cb);
-    CliRenderer::render_speed_results(speed_result);
+    try {
+        st.install();
+        auto spinner_cb = CliRenderer::make_spinner_callback();
+        auto speed_result = st.run(spinner_cb);
+        CliRenderer::render_speed_results(speed_result);
+    } catch (const std::exception& e) {
+         std::println(stderr, "\n{}Speedtest Error: {}{}", Color::RED, e.what(), Color::RESET);
+    }
 
     print_line();
     auto end_time = high_resolution_clock::now();
@@ -184,7 +198,7 @@ int main(int argc, char* argv[]) {
         std::string_view app_path = (argc > 0) ? argv[0] : "bench";
         run_app(app_path);
     } catch (const std::exception& e) {
-        std::println(stderr, "\n{}Error: {}{}", Color::RED, e.what(), Color::RESET);
+        std::println(stderr, "\n{}Fatal Error: {}{}", Color::RED, e.what(), Color::RESET);
         cleanup_artifacts();
         return 1;
     }
