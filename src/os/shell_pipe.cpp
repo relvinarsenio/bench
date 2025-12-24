@@ -39,8 +39,8 @@ ShellPipe::ShellPipe(const std::vector<std::string>& args) {
     }
 
     if (pid == 0) {
-        ::dup2(pipe_fds[1], STDOUT_FILENO);
-        ::dup2(pipe_fds[1], STDERR_FILENO);
+        if (::dup2(pipe_fds[1], STDOUT_FILENO) == -1) ::_exit(errno);
+        if (::dup2(pipe_fds[1], STDERR_FILENO) == -1) ::_exit(errno);
 
         ::close(pipe_fds[0]);
         ::close(pipe_fds[1]);

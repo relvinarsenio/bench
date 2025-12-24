@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "include/color.hpp"
+#include "include/config.hpp"
 #include "include/speed_test.hpp"
 
 namespace CliRenderer {
@@ -33,7 +34,7 @@ public:
                 std::print("\r{} {}", text_, frames[idx++ % frames.size()]);
                 std::cout.flush();
                 
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
+                std::this_thread::sleep_for(std::chrono::milliseconds(Config::UI_SPINNER_DELAY_MS));
             }
 
             std::print("\r{}\r", std::string(text_.size() + 2, ' '));

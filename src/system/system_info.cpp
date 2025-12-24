@@ -127,8 +127,10 @@ std::string SystemInfo::get_cpu_cores_freq() {
                 auto colon = line.find(':');
                 if (colon != std::string::npos) {
                     std::string_view val_str = trim_sv(std::string_view(line).substr(colon + 1));
-                    std::from_chars(val_str.data(), val_str.data() + val_str.size(), freq_mhz);
-                    break;
+                    auto [ptr, ec] = std::from_chars(val_str.data(), val_str.data() + val_str.size(), freq_mhz);
+                    if (ec == std::errc()) {
+                         break;
+                    }
                 }
             }
         }
@@ -211,13 +213,13 @@ std::string SystemInfo::get_virtualization() {
         unsigned int leaf = 0x40000000;
         __cpuid(leaf, eax, ebx, ecx, edx);
         
-        char vendor[13];
-        std::memcpy(vendor, &ebx, 4);
-        std::memcpy(vendor + 4, &ecx, 4);
-        std::memcpy(vendor + 8, &edx, 4);
+        std::array<char, 13> vendor{};
+        std::memcpy(vendor.data(), &ebx, 4);
+        std::memcpy(vendor.data() + 4, &ecx, 4);
+        std::memcpy(vendor.data() + 8, &edx, 4);
         vendor[12] = '\0';
         
-        std::string sig(vendor);
+        std::string sig(vendor.data());
         
         if (sig == "KVMKVMKVM") return "KVM";
         if (sig == "Microsoft Hv") return "Hyper-V";
@@ -318,13 +320,14 @@ std::vector<SwapEntry> SystemInfo::get_swaps() {
                 }
 
                 uint64_t val_size = 0, val_used = 0;
-                std::from_chars(size_str.data(), size_str.data() + size_str.size(), val_size);
-                std::from_chars(used_str.data(), used_str.data() + used_str.size(), val_used);
+                auto [p1, ec1] = std::from_chars(size_str.data(), size_str.data() + size_str.size(), val_size);
+                auto [p2, ec2] = std::from_chars(used_str.data(), used_str.data() + used_str.size(), val_used);
                 
-                entry.size = val_size * 1024;
-                entry.used = val_used * 1024;
-                
-                swaps.push_back(entry);
+                if (ec1 == std::errc() && ec2 == std::errc()) {
+                    entry.size = val_size * 1024;
+                    entry.used = val_used * 1024;
+                    swaps.push_back(entry);
+                }
             }
         }
     }
@@ -364,8 +367,12 @@ MemInfo SystemInfo::get_memory_status() {
                 sv = sv.substr(colon + 1);
                 while (!sv.empty() && std::isspace(sv.front())) sv.remove_prefix(1);
                 
-                std::from_chars(sv.data(), sv.data() + sv.size(), mem_available);
-                mem_available *= 1024;
+                auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), mem_available);
+                if (ec == std::errc()) {
+                    mem_available *= 1024;
+                } else {
+                    mem_available = 0;
+                }
                 break;
             }
         }
