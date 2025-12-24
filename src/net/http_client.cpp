@@ -1,5 +1,6 @@
 #include "include/http_client.hpp"
 #include "include/interrupts.hpp"
+#include "include/config.hpp"
 
 #include <cerrno>
 #include <filesystem>
@@ -96,7 +97,7 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
     
-    curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::HTTP_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_TCP_KEEPALIVE, 1L);
 
@@ -132,7 +133,7 @@ std::expected<void, std::string> HttpClient::download(const std::string& url, co
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEFUNCTION, write_file);
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &outfile);
     
-    curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 60L);
+    curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::SPEEDTEST_DL_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
 
     curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
@@ -164,4 +165,5 @@ bool HttpClient::check_connectivity(const std::string& host) {
     } catch (...) {
         return false;
     }
+}
 }
