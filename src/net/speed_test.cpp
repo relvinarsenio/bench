@@ -222,7 +222,11 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
             }
 
             if (!found_result && !entry.success && entry.error.empty()) {
-                entry.error = "No Result Data (JSON Parse Failed?)";
+                if (result.rate_limited) {
+                     // Ignore, already marked as rate limited
+                } else {
+                     entry.error = "No Result Data (JSON Parse Failed?)";
+                }
             }
             
             if (entry.rate_limited) {
