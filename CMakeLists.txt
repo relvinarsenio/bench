@@ -8,7 +8,7 @@ if(NOT DEFINED CMAKE_CXX_COMPILER)
     endif()
 endif()
 
-project(bench VERSION 1.0 LANGUAGES CXX)
+project(bench VERSION 6.9.6 LANGUAGES CXX)
 
 # --- 2. Dependencies ---
 find_package(CURL REQUIRED)
