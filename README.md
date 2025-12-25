@@ -49,8 +49,8 @@ Bench features an intelligent build system that automatically detects the optima
 #### Option A: Using GCC (Default)
 If you have GCC 14+ installed, simply run:
 ```bash
-cmake -S . -B build
-cmake --build build
+cmake -DCMAKE_BUILD_TYPE="Release" -S . -B build
+cmake --build build --parallel
 ```
 
 #### Option B: Using LLVM / Clang (Recommended for Performance)
