@@ -80,25 +80,19 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     message(STATUS "🔸 GCC detected: Using default GNU stack")
+    
+    # Validate GCC support for <print>
+    include(CheckIncludeFileCXX)
+    check_include_file_cxx("print" GCC_HAS_PRINT)
+    if(NOT GCC_HAS_PRINT)
+        message(FATAL_ERROR "❌ ERROR: GCC version too old. Header <print> not found.\n"
+                            "   Please upgrade to GCC 14+.")
+    endif()
 endif()
 
-# --- 5. STRICT CHECK: Wajib ada <print> ---
-# Reset variable check agar dicek ulang dengan flag yang sudah diset di atas
-unset(HAVE_STD_PRINT CACHE)
+# --- 5. Flags (Optimasi & Security) ---
 
-include(CheckIncludeFileCXX)
-# Ensure check uses the same flags
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CLANG_HAS_SYSTEM_PRINT)
-    set(CMAKE_REQUIRED_FLAGS "-stdlib=libc++")
-endif()
-check_include_file_cxx("print" HAVE_STD_PRINT)
-
-if(NOT HAVE_STD_PRINT)
-    message(FATAL_ERROR "❌ ERROR: Header <print> tidak ditemukan!\n"
-    "Harap gunakan GCC 14+ atau Clang 20+ dengan libc++ terbaru.")
-endif()
-
-# --- 6. Flags (Optimasi & Security) ---
+# --- 5. Flags (Optimasi & Security) ---
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
         -O3
