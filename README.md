@@ -60,8 +60,8 @@ If your system's `libstdc++` is outdated (lacks `<print>` support), CMake will a
 
 ```bash
 # Example using Clang 20
-cmake -DCMAKE_CXX_COMPILER=clang++-20 -S . -B build
-cmake --build build
+cmake -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_BUILD_TYPE="Release" -S . -B build
+cmake --build build --parallel
 ```
 
 ### 3. Run
