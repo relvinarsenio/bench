@@ -67,6 +67,19 @@ cmake --build build
 ./build/bench
 ```
 
+## 📦 Install via Package (Recommended)
+
+For those who prefer not to compile from source, you can download the pre-built binaries directly from the [Release Page](https://github.com/relvinarsenio/bench/releases/tag/v6.9.6):
+
+**Debian/Ubuntu:**
+```bash
+sudo dpkg -i bench_6.9.6_amd64.deb
+```
+
+**RHEL/Fedora/Oracle:**
+```bash
+sudo rpm -ivh bench-6.9.6-1.x86_64.rpm
+```
 ## 📊 Example Output
 
 ```text
