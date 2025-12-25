@@ -27,8 +27,54 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-# --- 4. STRICT CHECK: Wajib ada <print> ---
+# --- 4. Compiler Specific Configuration ---
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    include(CheckIncludeFileCXX)
+    
+    # 1. Cek dulu apakah library bawaan sistem (libstdc++) support <print>
+    message(STATUS "🔍 Checking system stdlib support for <print>...")
+    check_include_file_cxx("print" CLANG_HAS_SYSTEM_PRINT)
+
+    if (CLANG_HAS_SYSTEM_PRINT)
+        message(STATUS "✅ Clang: System libstdc++ supports <print>. Using system defaults.")
+        # Gunakan LLD agar support LTO (Clang bitcode)
+        add_link_options("-fuse-ld=lld") 
+    else()
+        message(STATUS "⚠️ Clang: System libstdc++ does NOT support <print>.")
+        message(STATUS "🔹 Switching to LLVM Full Stack (libc++, lld)...")
+        
+        add_compile_options(-stdlib=libc++)
+        add_link_options(-stdlib=libc++ -fuse-ld=lld)
+
+        # Attempt to find LLVM library path relative to compiler
+        get_filename_component(COMPILER_BIN ${CMAKE_CXX_COMPILER} REALPATH)
+        get_filename_component(COMPILER_DIR ${COMPILER_BIN} DIRECTORY)
+        get_filename_component(LLVM_ROOT ${COMPILER_DIR} DIRECTORY)
+        
+        set(LLVM_LIB_DIR "${LLVM_ROOT}/lib")
+        
+        if(EXISTS "${LLVM_LIB_DIR}/libc++.so")
+            message(STATUS "   Using LLVM libraries from: ${LLVM_LIB_DIR}")
+            link_directories(${LLVM_LIB_DIR})
+            add_link_options("-Wl,-rpath,${LLVM_LIB_DIR}")
+            # Ensure we link against the correct libraries
+            add_link_options(-lc++ -lc++abi)
+        endif()
+    endif()
+    
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    message(STATUS "🔸 GCC detected: Using default GNU stack")
+endif()
+
+# --- 5. STRICT CHECK: Wajib ada <print> ---
+# Reset variable check agar dicek ulang dengan flag yang sudah diset di atas
+unset(HAVE_STD_PRINT CACHE)
+
 include(CheckIncludeFileCXX)
+# Ensure check uses the same flags
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CLANG_HAS_SYSTEM_PRINT)
+    set(CMAKE_REQUIRED_FLAGS "-stdlib=libc++")
+endif()
 check_include_file_cxx("print" HAVE_STD_PRINT)
 
 if(NOT HAVE_STD_PRINT)
@@ -36,15 +82,25 @@ if(NOT HAVE_STD_PRINT)
     "Harap gunakan GCC 14+ atau Clang 18+ dengan libc++ terbaru.")
 endif()
 
-# --- 5. Flags (Optimasi & Security) ---
+# --- 6. Flags (Optimasi & Security) ---
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(
-        -O3 -flto=auto
+        -O3
         -Wall -Wextra
         -fstack-protector-strong -fPIE
         -D_FORTIFY_SOURCE=2
         -Wformat -Werror=format-security
     )
+    
+    # LTO Configuration
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(STATUS "🚀 Clang: Enabling Full LTO")
+        add_compile_options(-flto=full)
+        add_link_options(-flto=full)
+    else()
+        add_compile_options(-flto=auto)
+        add_link_options(-flto=auto)
+    endif()
     
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
         add_compile_options(-march=x86-64-v3 -fcf-protection)
@@ -53,7 +109,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_link_options(-Wl,-z,relro -Wl,-z,now -Wl,--gc-sections -pie)
 endif()
 
-# --- 6. Build ---
+# --- 7. Build ---
 add_executable(bench
     src/app/main.cpp
     src/core/interrupts.cpp
