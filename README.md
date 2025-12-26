@@ -82,6 +82,12 @@ sudo dpkg -i bench_6.9.6_amd64.deb
 ```bash
 sudo rpm -ivh bench-6.9.6-1.x86_64.rpm
 ```
+
+**Another Distro:**
+```bash
+curl -L -o bench https://github.com/relvinarsenio/bench/releases/latest/download/bench && chmod +x bench && ./bench
+```
+
 ## 📊 Example Output
 
 ```text
