@@ -37,7 +37,7 @@ curl -L -o bench https://github.com/relvinarsenio/bench/releases/latest/download
 |-----------|-----------------|-------|
 | **OS** | Linux | Any distro (Ubuntu, Debian, RHEL, Alpine, etc.) |
 | **Compiler** | GCC 14+ or Clang 20+ | Auto-detected based on std::print support |
-| **CMake** | 3.20+ | Build system |
+| **CMake** | 3.24+ | Build system |
 | **Perl** | 5.x | Required for OpenSSL build |
 
 ### Smart Compiler Detection 🧠

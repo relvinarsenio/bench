@@ -106,17 +106,63 @@ if(NOT EXISTS "${OPENSSL_INSTALL_DIR}/lib/libssl.a" OR NOT EXISTS "${OPENSSL_INS
     endif()
     
     # Configure (libraries only, no apps/tests/docs)
-    message(STATUS "   Configuring OpenSSL (libraries only)...")
+    # Note: OpenSSL LTO disabled - doesn't help with final binary size and adds complexity
+    set(OPENSSL_CC "${CMAKE_C_COMPILER}")
+    set(OPENSSL_AR "${CMAKE_AR}")
+    set(OPENSSL_RANLIB "${CMAKE_RANLIB}")
+    
+    # Fallback to system tools if CMAKE_AR/RANLIB not set
+    if(NOT OPENSSL_AR)
+        set(OPENSSL_AR "ar")
+    endif()
+    if(NOT OPENSSL_RANLIB)
+        set(OPENSSL_RANLIB "ranlib")
+    endif()
+    
+    message(STATUS "   OpenSSL toolchain: CC=${OPENSSL_CC}, AR=${OPENSSL_AR}, RANLIB=${OPENSSL_RANLIB}")
+    
+    message(STATUS "   Configuring OpenSSL (libraries only, minimal ciphers)...")
     execute_process(
         COMMAND ./Configure 
             --prefix=${OPENSSL_INSTALL_DIR}
             --libdir=lib
+            CC=${OPENSSL_CC}
+            AR=${OPENSSL_AR}
+            RANLIB=${OPENSSL_RANLIB}
             no-shared
             no-apps
             no-tests
             no-docs
             no-ui-console
+            # Disable legacy/weak ciphers (not needed for modern HTTPS)
+            no-des
+            no-rc2
+            no-rc4
+            no-rc5
+            no-md4
+            no-mdc2
+            no-idea
+            no-seed
+            no-bf
+            no-cast
+            no-camellia
+            no-aria
+            no-sm2
+            no-sm3
+            no-sm4
+            no-whirlpool
+            no-rmd160
+            no-scrypt
+            no-ssl3
+            no-dtls
+            no-dtls1
+            no-comp
+            no-engine
+            no-deprecated
+            no-legacy
+            # Keep only what we need for TLS 1.2/1.3
             linux-x86_64
+            -O3
         WORKING_DIRECTORY ${OPENSSL_SRC}
         RESULT_VARIABLE CONFIG_RESULT
         OUTPUT_QUIET
@@ -128,7 +174,10 @@ if(NOT EXISTS "${OPENSSL_INSTALL_DIR}/lib/libssl.a" OR NOT EXISTS "${OPENSSL_INS
     # Build ONLY libraries (much faster than full build)
     message(STATUS "   Building OpenSSL libraries (using ${NPROC} cores)...")
     execute_process(
-        COMMAND make -j${NPROC} build_libs
+        COMMAND make -j${NPROC} build_libs 
+            CC=${OPENSSL_CC}
+            AR=${OPENSSL_AR}
+            RANLIB=${OPENSSL_RANLIB}
         WORKING_DIRECTORY ${OPENSSL_SRC}
         RESULT_VARIABLE BUILD_RESULT
     )

@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
+
+# Fix FetchContent timestamp warning (CMP0135)
+cmake_policy(SET CMP0135 NEW)
 
 # =============================================================================
 # Bench - Modern Linux Server Benchmark
@@ -9,6 +12,61 @@ project(bench VERSION 6.9.6 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# =============================================================================
+# LLVM Toolchain Detection (for Clang builds)
+# =============================================================================
+# Use full LLVM toolchain for consistent builds when using Clang compiler.
+# This applies to ALL targets: zlib, libcurl, and main project code.
+# =============================================================================
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    find_program(LLVM_AR llvm-ar)
+    find_program(LLVM_RANLIB llvm-ranlib)
+    find_program(LLVM_NM llvm-nm)
+    
+    if(LLVM_AR)
+        set(CMAKE_AR "${LLVM_AR}" CACHE FILEPATH "Archiver" FORCE)
+        message(STATUS "🔧 Using llvm-ar: ${LLVM_AR}")
+    endif()
+    if(LLVM_RANLIB)
+        set(CMAKE_RANLIB "${LLVM_RANLIB}" CACHE FILEPATH "Ranlib" FORCE)
+        message(STATUS "🔧 Using llvm-ranlib: ${LLVM_RANLIB}")
+    endif()
+    if(LLVM_NM)
+        set(CMAKE_NM "${LLVM_NM}" CACHE FILEPATH "NM" FORCE)
+        message(STATUS "🔧 Using llvm-nm: ${LLVM_NM}")
+    endif()
+endif()
+
+# =============================================================================
+# Optimization flags (compiler-specific)
+# =============================================================================
+# Clang: -Oz (aggressive size optimization) - smaller binary
+# GCC:   -O3 (aggressive speed optimization) - faster code
+# =============================================================================
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    # Common flags for both compilers
+    add_compile_options(
+        -ffunction-sections     # Put each function in its own section
+        -fdata-sections         # Put each data item in its own section
+        -fvisibility=hidden     # Hide symbols by default
+    )
+    add_link_options(
+        -Wl,--gc-sections       # Remove unused sections (linker garbage collection)
+        -Wl,--as-needed         # Only link libraries that are actually used
+    )
+    
+    # Compiler-specific optimization level
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-Oz -flto)
+        add_link_options(-Oz -flto)
+        message(STATUS "🚀 Optimization: Clang -Oz + LTO + GC sections (size optimized)")
+    else()
+        add_compile_options(-O3 -flto)
+        add_link_options(-O3 -flto)
+        message(STATUS "🚀 Optimization: GCC -O3 + LTO + GC sections (speed optimized)")
+    endif()
+endif()
 
 # Add cmake modules path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
