@@ -134,6 +134,7 @@ if(NOT EXISTS "${OPENSSL_INSTALL_DIR}/lib/libssl.a" OR NOT EXISTS "${OPENSSL_INS
             no-tests
             no-docs
             no-ui-console
+            no-autoload-config
             # Disable legacy/weak ciphers (not needed for modern HTTPS)
             no-des
             no-rc2

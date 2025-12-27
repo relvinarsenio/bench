@@ -123,6 +123,7 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::HTTP_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
@@ -158,6 +159,7 @@ std::expected<void, std::string> HttpClient::download(const std::string& url, co
     
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::SPEEDTEST_DL_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
@@ -184,6 +186,7 @@ bool HttpClient::check_connectivity(const std::string& host) {
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 5L);
         curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, kUserAgent);
+        curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
         return curl_easy_perform(handle_.get()) == CURLE_OK;
     } catch (...) {
         return false;
