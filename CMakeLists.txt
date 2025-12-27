@@ -1,110 +1,83 @@
 cmake_minimum_required(VERSION 3.20)
 
-# --- 1. Setup Compiler & Project ---
+# =============================================================================
+# Bench - Modern Linux Server Benchmark
+# =============================================================================
 project(bench VERSION 6.9.6 LANGUAGES CXX C)
 
-# Force C++23
+# C++23 Required
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# --- 2. Dependencies (FORCE STATIC .a FILES) ---
+# Add cmake modules path
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# =============================================================================
+# 1. Smart Compiler Detection (GCC 14+ or Clang 20+)
+# =============================================================================
+# Tries in order:
+#   1. GCC 14+ with libstdc++ (if std::print works)
+#   2. Clang 20+ with libstdc++ (RHEL/Fedora)
+#   3. Clang 20+ with libc++ (Ubuntu/Alpine)
+# =============================================================================
+include(DetectCompiler)
+
+# =============================================================================
+# 2. Configure Static Dependencies (ALL FROM SOURCE)
+# =============================================================================
 include(FetchContent)
+include(StaticDeps)
 
-set(LLVM_LIB_PATH "/usr/lib/llvm-20/lib")
-if(NOT EXISTS "${LLVM_LIB_PATH}/libc++.a")
-    message(FATAL_ERROR "❌ libc++.a gak ketemu.")
-endif()
-
-set(STL_STATIC_LIBS 
-    "${LLVM_LIB_PATH}/libc++.a"
-    "${LLVM_LIB_PATH}/libc++abi.a"
-    "${LLVM_LIB_PATH}/libunwind.a"
-)
-
-# --- TARGET HIJACKING: ZLIB ---
-# Cari file static-nya dulu
-find_library(ZLIB_STATIC_LIB 
-    NAMES libz.a 
-    PATHS /usr/lib/x86_64-linux-gnu /usr/lib /usr/local/lib
-    NO_DEFAULT_PATH
-)
-if(NOT ZLIB_STATIC_LIB) # Fallback
-    find_library(ZLIB_STATIC_LIB NAMES libz.a)
-endif()
-
-if(NOT ZLIB_STATIC_LIB)
-    message(FATAL_ERROR "❌ libz.a GAK KETEMU!")
-else()
-    message(STATUS "🔒 ZLIB Static Found: ${ZLIB_STATIC_LIB}")
-endif()
-
-# INI KUNCINYA: Kita bikin target ZLIB::ZLIB manual biar CURL ketipu
-if(NOT TARGET ZLIB::ZLIB)
-    add_library(ZLIB::ZLIB UNKNOWN IMPORTED GLOBAL)
-    set_target_properties(ZLIB::ZLIB PROPERTIES
-        IMPORTED_LOCATION "${ZLIB_STATIC_LIB}"
-        INTERFACE_INCLUDE_DIRECTORIES "/usr/include"
-    )
-endif()
-
-# Paksa variable standar CMake juga (biar makin yakin)
-set(ZLIB_LIBRARY "${ZLIB_STATIC_LIB}" CACHE FILEPATH "" FORCE)
-set(ZLIB_LIBRARIES "${ZLIB_STATIC_LIB}" CACHE FILEPATH "" FORCE)
-set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
-
-# OpenSSL Static
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-find_package(OpenSSL REQUIRED)
-find_package(Threads REQUIRED)
-
-# A. nlohmann/json
+# Fetch nlohmann/json
 FetchContent_Declare(
     json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
 )
 FetchContent_MakeAvailable(json)
 
-# B. CURL (Static)
-set(BUILD_CURL_EXE OFF CACHE INTERNAL "")
-set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "") 
-set(CURL_USE_LIBPSL OFF CACHE INTERNAL "")
-set(CURL_USE_LIBSSH2 OFF CACHE INTERNAL "")
-set(CURL_USE_OPENSSL ON CACHE INTERNAL "") 
-set(CURL_DISABLE_LDAP ON CACHE INTERNAL "") 
-set(CURL_DISABLE_LDAPS ON CACHE INTERNAL "")
-
-# Paksa CURL pake ZLIB kita
-set(CURL_ZLIB ON CACHE INTERNAL "")
-set(UseZLIB ON CACHE INTERNAL "")
-
+# Fetch libcurl (uses OpenSSL and ZLIB built in StaticDeps.cmake)
 FetchContent_Declare(
     CURL
-    URL https://github.com/curl/curl/releases/download/curl-8_5_0/curl-8.5.0.tar.xz
+    URL https://github.com/curl/curl/releases/download/curl-8_17_0/curl-8.17.0.tar.xz
 )
 FetchContent_MakeAvailable(CURL)
 
-# --- 3. Compiler Configuration ---
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(STATUS "🔧 Configuring Clang: ☢️ FULL STATIC MODE ☢️")
-    add_compile_options("-stdlib=libc++")
-    add_link_options("-static") 
-    add_link_options("-fuse-ld=lld")
-    add_link_options("-nostdlib++") 
+# =============================================================================
+# 3. Compiler Configuration (based on DetectCompiler.cmake results)
+# =============================================================================
+add_link_options("-static")
 
-    include(CheckIncludeFileCXX)
-    set(CMAKE_REQUIRED_FLAGS "-std=c++23 -stdlib=libc++")
-    check_include_file_cxx("print" CLANG_HAS_PRINT)
-    unset(CMAKE_REQUIRED_FLAGS)
+if(USE_LIBCXX)
+    # Clang with libc++ (Ubuntu/Alpine)
+    message(STATUS "🔧 Mode: Clang ${DETECTED_COMPILER_VERSION} + libc++ (LLVM Full Stack)")
+    add_compile_options("-stdlib=libc++")
+    add_link_options("-fuse-ld=lld")
+    add_link_options("-nostdlib++")
+    
+elseif(USE_LIBSTDCXX AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Clang with libstdc++ (RHEL/Fedora)
+    message(STATUS "🔧 Mode: Clang ${DETECTED_COMPILER_VERSION} + libstdc++ (GNU)")
+    add_link_options("-fuse-ld=lld")
+    
+elseif(USE_LIBSTDCXX AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC with libstdc++
+    message(STATUS "🔧 Mode: GCC ${DETECTED_COMPILER_VERSION} + libstdc++ (Full GNU)")
+    # GCC uses gold or bfd linker by default
 endif()
 
-# --- 4. Optimization ---
+# =============================================================================
+# 4. Optimization Flags
+# =============================================================================
 add_compile_options(-O3 -Wall -Wextra -fPIE)
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64")
     add_compile_options(-march=x86-64-v3)
 endif()
 
-# --- 5. Build Target ---
+# =============================================================================
+# 5. Build Target
+# =============================================================================
 add_executable(bench
     src/app/main.cpp
     src/core/interrupts.cpp
@@ -123,33 +96,46 @@ target_include_directories(bench PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# --- 6. Linking ---
-# Kita pake ZLIB::ZLIB (Target palsu yg udah kita bikin di atas)
+# =============================================================================
+# 6. Linking
+# =============================================================================
 target_link_libraries(bench 
     PRIVATE 
     CURL::libcurl
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
-    ZLIB::ZLIB          # <--- Pake target, jangan path variable
-    ${STL_STATIC_LIBS}   
-    Threads::Threads     
-    m                    
+    ZLIB::ZLIB
+    Threads::Threads
+    m
 )
 
-# --- 7. Install & Packaging ---
+# Add static C++ stdlib libs based on detected configuration
+if(USE_LIBCXX AND STL_STATIC_LIBS)
+    # Clang + libc++: link static libc++.a, libc++abi.a, etc.
+    target_link_libraries(bench PRIVATE ${STL_STATIC_LIBS})
+    
+    # On musl systems (Alpine), also need to link libc++abi explicitly
+    # and potentially compiler-rt builtins
+    if(EXISTS "/usr/lib/libc++abi.a")
+        target_link_libraries(bench PRIVATE /usr/lib/libc++abi.a)
+    endif()
+elseif(USE_LIBSTDCXX)
+    # GCC or Clang + libstdc++: link static libstdc++
+    target_link_libraries(bench PRIVATE -static-libstdc++ -static-libgcc)
+endif()
+
+# =============================================================================
+# 7. Install & Packaging (CPack)
+# =============================================================================
 install(TARGETS bench DESTINATION bin)
-# -- A. Metadata Dasar --
-set(CPACK_PACKAGE_NAME "bench") # Nama paket di repo (cth: apt install bench-tool)
+
+set(CPACK_PACKAGE_NAME "bench")
 set(CPACK_PACKAGE_VENDOR "Alfie Ardinata")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_CONTACT "Alfie Ardinata <alfieardinata@outlook.com>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/relvinarsenio/bench")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "System Information & Network Benchmark Tool")
-
-# -- B. Deskripsi Panjang (Biar pro) --
-# Lu bisa taruh ini di file README.txt terus pake CPACK_PACKAGE_DESCRIPTION_FILE
-# Tapi gw hardcode di sini biar lu gak ribet bikin file baru.
 set(CPACK_PACKAGE_DESCRIPTION "Bench is a high-performance Linux server benchmarking tool written in Modern C++ (C++23).
 Features:
 - Network Speed Test (Upload/Download)
@@ -157,20 +143,14 @@ Features:
 - System Information Monitoring
 - Fully Static Build (No Dependencies Required)")
 
-# -- C. Config Debian (.deb) Specific --
+# Debian package settings
 set(CPACK_GENERATOR "TGZ;DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Alfie Ardinata <alfieardinata@outlook.com>")
-set(CPACK_DEBIAN_PACKAGE_SECTION "utils") # Masuk kategori 'utils'
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
-
-# -- D. Dependencies --
-# Karena kita STATIC, kita matikan auto-dependency detection.
-# Kita set manual aja ke libc6 (standar linux) buat formalitas.
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
-
-# -- E. Strip Binary (PENTING BUAT STATIC) --
-# Binary static itu gede. Opsi ini bakal buang symbol debug biar file .deb nya kecil.
 set(CPACK_STRIP_FILES TRUE)
 set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
+
 include(CPack)
