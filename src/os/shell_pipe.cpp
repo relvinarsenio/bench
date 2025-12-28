@@ -63,9 +63,33 @@ ShellPipe::~ShellPipe() {
     if (read_fd_ != -1) {
         ::close(read_fd_);
     }
+
     if (pid_ != -1) {
         ::kill(pid_, SIGTERM);
-        ::waitpid(pid_, nullptr, 0);
+        
+        bool exited = false;
+        for (int i = 0; i < 10; ++i) {
+            int status;
+            pid_t result = ::waitpid(pid_, &status, WNOHANG);
+            
+            if (result == pid_) {
+                exited = true;
+                break;
+            }
+            
+            if (result == -1) {
+                if (errno == EINTR) continue;
+                exited = true; 
+                break;
+            }
+            
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        if (!exited) {
+            ::kill(pid_, SIGKILL);
+            ::waitpid(pid_, nullptr, 0); 
+        }
     }
 }
 
