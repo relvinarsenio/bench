@@ -6,14 +6,14 @@
 #include <cerrno>
 #include <cstring>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <system_error>
 #include <unistd.h>
 #include <signal.h>
-#include <thread>
-#include <chrono>
 
 ShellPipe::ShellPipe(const std::vector<std::string>& args) {
     if (args.empty()) {
