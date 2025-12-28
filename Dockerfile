@@ -1,23 +1,10 @@
 # =============================================================================
 # Dockerfile - Musl Static Build for Bench
 # =============================================================================
-# This Dockerfile builds a fully static binary using musl libc.
-# The resulting binary can run on ANY Linux distribution without dependencies.
-#
-# ALL dependencies (zlib, openssl, curl, json) are built from source.
-# Only musl libc comes from the OS.
-#
-# Usage:
-#   docker build -t bench-builder .
-#   docker run --rm -v $(pwd)/dist:/dist bench-builder
-#
-# Or use the helper script:
-#   ./build-static.sh
-# =============================================================================
-
 FROM alpine:latest AS builder
 
-# Install ONLY build tools - all libraries are built from source
+# 1. Install Build Tools
+# Tambahin 'xxd' disini wajib!
 RUN apk add --no-cache \
     clang \
     lld \
@@ -31,7 +18,7 @@ RUN apk add --no-cache \
     llvm-libunwind-static \
     perl \
     bash \
-    xxd
+    xxd 
 
 # Set working directory
 WORKDIR /src
@@ -42,8 +29,8 @@ COPY cmake/ ./cmake/
 COPY include/ ./include/
 COPY src/ ./src/
 
-# Configure and build
-# Note: We set additional linker flags for Alpine's static libc++ requirements
+# 2. Configure and build
+# Kita pake Clang + LLVM Linker (lld) + libc++ static
 RUN mkdir build && cd build && \
     CC=clang CXX=clang++ cmake .. \
         -DCMAKE_BUILD_TYPE=Release \
@@ -54,26 +41,16 @@ RUN mkdir build && cd build && \
         -DOPENSSL_USE_STATIC_LIBS=ON && \
     make -j$(nproc)
 
-# Strip the binary to reduce size
+# Strip binary biar size makin kecil (buang debug symbols)
 RUN strip build/bench
 
-# Verify it's static
-RUN file build/bench && \
-    ! ldd build/bench 2>/dev/null || true
-
 # =============================================================================
-# Output Stage - Extract the binary
-# =============================================================================
-FROM scratch AS export
-
-COPY --from=builder /src/build/bench /bench
-
-# =============================================================================
-# Runtime Stage (optional) - Minimal container with just the binary
+# Runtime Stage - PURE SCRATCH (Kosong melompong)
 # =============================================================================
 FROM scratch AS runtime
 
+# Copy binary doang.
+# GAK PERLU copy ca-certificates.crt lagi (karena udah embedded)
 COPY --from=builder /src/build/bench /bench
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ENTRYPOINT ["/bench"]

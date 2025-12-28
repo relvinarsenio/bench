@@ -132,6 +132,11 @@ strip build/bench
 # Install build tools (GCC 14+ and libstdc++ have std::print support)
 sudo dnf install -y gcc-c++ cmake make perl xxd
 
+# Install Glibc Static and libstdc++ static on CRB Repo (Example On Oracle Linux)
+sudo dnf install --enablerepo="ol10_codeready_builder" glibc-static libstdc++-static
+
+# Note: RHEL family distributions do not provide static libraries by default.
+
 # Build (auto-detects GCC + libstdc++)
 cmake -DCMAKE_BUILD_TYPE="Release" -S . -B build
 cmake --build build -j$(nproc)
