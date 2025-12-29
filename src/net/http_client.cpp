@@ -1,6 +1,7 @@
 #include "include/http_client.hpp"
 #include "include/interrupts.hpp"
 #include "include/config.hpp"
+#include "include/embedded_cert.hpp"
 
 #include <cerrno>
 #include <filesystem>
@@ -13,23 +14,6 @@
 namespace {
 
 constexpr auto kUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-std::string get_ca_bundle_path() {
-    constexpr std::array paths = {
-        "/etc/ssl/certs/ca-certificates.crt",
-        "/etc/pki/tls/certs/ca-bundle.crt",
-        "/etc/ssl/ca-bundle.pem",
-        "/etc/pki/tls/cacert.pem",
-        "/etc/ssl/cert.pem"
-    };
-
-    for (const auto& path : paths) {
-        if (std::filesystem::exists(path)) {
-            return path;
-        }
-    }
-    return "";
-}
 
 struct CurlSlistDeleter {
     void operator()(struct curl_slist* list) const noexcept {
@@ -69,10 +53,11 @@ void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
     curl_easy_setopt(handle, CURLOPT_REFERER, "https://www.google.com/");
     curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br");
 
-    static const std::string ca_path = get_ca_bundle_path();
-    if (!ca_path.empty()) {
-        curl_easy_setopt(handle, CURLOPT_CAINFO, ca_path.c_str());
-    }
+    struct curl_blob blob{};
+    blob.data = (void*)cacert_pem;
+    blob.len = cacert_pem_len;
+    blob.flags = CURL_BLOB_COPY;
+    curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &blob);
 }
 
 }
@@ -99,7 +84,7 @@ size_t HttpClient::write_file(void* ptr, size_t size, size_t nmemb, std::ofstrea
         size_t total_size = size * nmemb;
         std::span<const char> data_view(static_cast<const char*>(ptr), total_size);
         
-        f->write(data_view.data(), data_view.size());
+        f->write(data_view.data(), static_cast<std::streamsize>(data_view.size()));
         
         if (!*f) return 0;
         return total_size;
@@ -121,8 +106,10 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
     
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::HTTP_TIMEOUT_SEC);
+    curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::HTTP_CONNECT_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
@@ -157,7 +144,9 @@ std::expected<void, std::string> HttpClient::download(const std::string& url, co
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &outfile);
     
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::SPEEDTEST_DL_TIMEOUT_SEC);
+    curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::HTTP_CONNECT_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
@@ -182,8 +171,11 @@ bool HttpClient::check_connectivity(const std::string& host) {
         curl_easy_reset(handle_.get());
         curl_easy_setopt(handle_.get(), CURLOPT_URL, ("http://" + host).c_str());
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
-        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 5L);
+        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::CHECK_CONN_TIMEOUT_SEC);
+        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
         curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, kUserAgent);
+        curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
+        curl_easy_setopt(handle_.get(), CURLOPT_FORBID_REUSE, 1L);
         return curl_easy_perform(handle_.get()) == CURLE_OK;
     } catch (...) {
         return false;

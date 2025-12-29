@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -65,7 +66,7 @@ std::string SystemInfo::get_model_name() {
             
             std::string brand;
             brand.resize(48);
-            std::memcpy(brand.data(), data.data(), 48);
+            std::memcpy(brand.data(), data.data(), std::min(brand.size(), sizeof(data)));
             
             if (auto pos = brand.find('\0'); pos != std::string::npos) {
                 brand.resize(pos);
@@ -150,22 +151,22 @@ std::string SystemInfo::get_cpu_cache() {
         if (ec != std::errc()) return s; 
 
         if (ptr < s.data() + s.size()) {
-            char suffix = std::toupper(static_cast<unsigned char>(*ptr));
+            char suffix = static_cast<char>(std::toupper(static_cast<unsigned char>(*ptr)));
             if (suffix == 'K') size *= 1024;
             else if (suffix == 'M') size *= 1024 * 1024;
         } else {
-             if (std::toupper(static_cast<unsigned char>(s.back())) == 'K') size *= 1024; 
+             if (static_cast<char>(std::toupper(static_cast<unsigned char>(s.back()))) == 'K') size *= 1024; 
              else if (std::isdigit(static_cast<unsigned char>(s.back()))) size *= 1024;
         }
 
-        if (size >= 1024 * 1024) return std::format("{:.0f} MB", size / (1024.0 * 1024.0));
-        if (size >= 1024) return std::format("{:.0f} KB", size / 1024.0);
+        if (size >= 1024 * 1024) return std::format("{:.0f} MB", static_cast<double>(size) / (1024.0 * 1024.0));
+        if (size >= 1024) return std::format("{:.0f} KB", static_cast<double>(size) / 1024.0);
         return std::format("{} B", size);
     };
 
-    std::vector<std::string> caches = {"3", "2", "1", "0"};
+    constexpr std::array<std::string_view, 4> caches = {"3", "2", "1", "0"};
     for(const auto& idx : caches) {
-        std::string path = "/sys/devices/system/cpu/cpu0/cache/index" + idx + "/size";
+        std::string path = std::format("/sys/devices/system/cpu/cpu0/cache/index{}/size", idx);
         std::ifstream f(path);
         std::string size;
         if (f >> size) return parse_cache(size);
@@ -206,7 +207,7 @@ std::string SystemInfo::get_virtualization() {
     #if defined(__x86_64__) || defined(__i386__)
     unsigned int eax, ebx, ecx, edx;
     __cpuid(1, eax, ebx, ecx, edx); 
-    if (ecx & (1 << 31)) hv_bit = true;
+    if (ecx & (1U << 31)) hv_bit = true;
     #endif
 
     if (hv_bit) {
@@ -260,7 +261,7 @@ std::string SystemInfo::get_arch() {
     struct utsname buffer;
     if (uname(&buffer) == 0) {
         std::string arch = buffer.machine;
-        int bits = sizeof(void*) * 8;
+        int bits = static_cast<int>(sizeof(void*) * 8);
         return std::format("{} ({} Bit)", arch, bits);
     }
     return "Unknown";
@@ -282,10 +283,10 @@ std::string SystemInfo::get_tcp_cc() {
 std::string SystemInfo::get_uptime() {
     struct sysinfo si;
     if (sysinfo(&si) == 0) {
-        long up = si.uptime;
-        int days = up / 86400;
-        int hours = (up % 86400) / 3600;
-        int mins = (up % 3600) / 60;
+        auto up = si.uptime;
+        int days = static_cast<int>(up / 86400);
+        int hours = static_cast<int>((up % 86400) / 3600);
+        int mins = static_cast<int>((up % 3600) / 60);
         return std::format("{} days, {} hour {} min", days, hours, mins);
     }
     return "Unknown";
@@ -366,7 +367,7 @@ MemInfo SystemInfo::get_memory_status() {
             auto colon = sv.find(':');
             if (colon != std::string_view::npos) {
                 sv = sv.substr(colon + 1);
-                while (!sv.empty() && std::isspace(sv.front())) sv.remove_prefix(1);
+                sv = trim_sv(sv);
                 
                 auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), mem_available);
                 if (ec == std::errc()) {

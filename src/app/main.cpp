@@ -11,6 +11,7 @@
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
+#include <openssl/crypto.h>
 
 #include "include/cli_renderer.hpp"
 #include "include/color.hpp"
@@ -30,6 +31,10 @@ using json = nlohmann::json;
 class LibCurlContext {
 public:
     LibCurlContext() {
+        if (OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, nullptr) == 0) {
+            throw std::runtime_error("Failed to initialize OpenSSL crypto library");
+        }
+        
         if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
             throw std::runtime_error("Failed to initialize libcurl globally");
         }
@@ -53,7 +58,7 @@ void run_app(std::string_view app_path) {
     std::print("\033c");
     std::cout << std::flush;
     print_line();
-    std::println(" A Bench Script (C++ Edition v6.9.6)");
+    std::println(" A Bench Script (C++ Edition v7.0.0)");
     std::println(" Usage : ./{}", app_name);
     print_line();
 

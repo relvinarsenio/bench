@@ -1,88 +1,152 @@
 # Bench - Modern Linux Server Benchmark
 
-**Bench** is a high-performance Linux server benchmarking tool written in **Modern C++ (C++23)**. It is designed to provide accurate, detailed, and memory-safe performance metrics.
+**Bench** is a high-performance Linux server benchmarking tool written in **Modern C++ (C++23)**. It provides accurate, detailed, and memory-safe performance metrics.
 
-Unlike traditional bash scripts, Bench parses kernel interfaces (`/proc`, `/sys`) directly and utilizes native *system calls* to ensure precision and minimal overhead.
+Unlike traditional bash scripts, Bench parses kernel interfaces (`/proc`, `/sys`) directly and utilizes native system calls to ensure precision and minimal overhead.
 
-Inspired by the legendary [bench.sh](https://github.com/teddysun/across/blob/master/bench.sh), rewritten in Modern C++ for maximum accuracy and zero-overhead performance
+Inspired by the legendary [bench.sh](https://github.com/teddysun/across/blob/master/bench.sh), rewritten in Modern C++ for maximum accuracy and zero-overhead performance.
 
 ## 🔥 Key Features
 
-* **Hardcore Disk I/O Test**: Utilizes the `O_DIRECT` flag to bypass the RAM Cache (Page Cache), measuring the true raw speed of the disk.
-* **Detailed System Info**: Performs deep hardware detection (CPU Model, Cache, Virtualization Type, Swap Types) without relying on external tools like `lscpu`.
-* **Network Speedtest**: Integrates with the official Ookla Speedtest CLI (via JSON parsing) to provide accurate latency, jitter, and packet loss data.
-* **Memory Safe & Robust**: Built with RAII principles, *Async-Signal-Safe* handling, and optimistic error management to ensure stability.
-* **Modern Tech Stack**: Leverages the latest C++23 features such as `std::print`, `std::format`, and `std::expected`.
+* **Hardcore Disk I/O Test**: Uses `O_DIRECT` flag to bypass RAM Cache (Page Cache), measuring true raw disk speed.
+* **Detailed System Info**: Deep hardware detection (CPU Model, Cache, Virtualization Type, Swap Types) without relying on external tools.
+* **Network Speedtest**: Integrates with official Ookla Speedtest CLI via JSON parsing for accurate latency, jitter, and packet loss data.
+* **Memory Safe & Robust**: Built with RAII principles, Async-Signal-Safe handling, and optimistic error management.
+* **Fully Static Binary**: Zero runtime dependencies - runs on any Linux distribution.
+* **Modern Tech Stack**: Leverages C++23 features (`std::print`, `std::format`, `std::expected`).
 
-## 🛠️ Requirements
+---
 
-Since this project utilizes the latest C++ standards, ensure your environment supports:
+## 📦 Quick Start (Pre-built Binary)
 
-* **OS**: Linux (RHEL, Oracle Linux, Ubuntu, Debian, etc.).
-* **Compiler**: 
-    * **GCC 14+** (Native support for `<print>`).
-    * **Clang 20+** (Support via LLVM Full Stack: `libc++` + `lld`).
-* **Build System**: CMake 3.20+.
-* **Dependencies**: `libcurl-devel` (RHEL/CentOS) or `libcurl4-openssl-dev` (Debian/Ubuntu).
-
-## 🚀 Build & Install
-
-### 1. Install Dependencies
-
-**Ubuntu / Debian:**
-```bash
-sudo apt update
-sudo apt install cmake build-essential libcurl4-openssl-dev
-# Optional: Install LLVM Full Stack
-# sudo apt install clang-20 libc++-20-dev libc++abi-20-dev lld-20
-```
-
-**RHEL / Oracle Linux:**
-```bash
-sudo dnf install cmake gcc-c++ libcurl-devel
-```
-
-### 2. Build Project
-
-Bench features an intelligent build system that automatically detects the optimal configuration for your compiler.
-
-#### Option A: Using GCC (Default)
-If you have GCC 14+ installed, simply run:
-```bash
-cmake -DCMAKE_BUILD_TYPE="Release" -S . -B build
-cmake --build build --parallel
-```
-
-#### Option B: Using LLVM / Clang (Recommended for Performance)
-If you are using Clang, CMake will automatically enable **Thin LTO (Link Time Optimization)** and detect the appropriate standard library.
-
-If your system's `libstdc++` is outdated (lacks `<print>` support), CMake will automatically switch to the **LLVM Full Stack** (`libc++` + `lld`).
+Download and run the pre-built static binary - **no compilation required**:
 
 ```bash
-# Example using Clang 20
-cmake -DCMAKE_CXX_COMPILER=clang++-20 -DCMAKE_BUILD_TYPE="Release" -S . -B build
-cmake --build build --parallel
+curl -L -o bench https://github.com/relvinarsenio/bench/releases/latest/download/bench \
+  && chmod +x bench \
+  && ./bench
 ```
 
-### 3. Run
+---
+
+## 🛠️ Build from Source
+
+### Requirements
+
+| Component | Requirement | Notes |
+|-----------|-------------|-------|
+| **OS** | Linux | Any distro with Docker support |
+| **Docker** | 20.10+ | Required for building |
+
+### All Dependencies Built from Source ✨
+
+This project is **fully reproducible** - all dependencies are automatically downloaded and built from source during the Docker build:
+
+| Library | Version | Purpose | Optimization |
+|---------|---------|---------|--------------|
+| **zlib** | 1.3.1 | Compression | Full LTO + -Oz |
+| **LibreSSL** | 4.2.1 | TLS/SSL (libs only) | Full LTO + -Oz |
+| **libcurl** | 8.17.0 | HTTP/HTTPS only | Full LTO + -Oz |
+| **nlohmann/json** | 3.12.0 | JSON parsing | Header-only |
+
+> **Build Optimizations**:
+> - All libraries compiled with **Full LTO** and **-Oz** for maximum performance
+> - Final binary compiled with **-Oz** for size optimization
+> - libcurl built with **ultra-minimal features** (HTTP/HTTPS only, no FTP/LDAP/SMTP/etc.)
+> - LibreSSL built without apps/tests/netcat
+> - ICF (Identical Code Folding) enabled for the final binary
+
+### Build with Docker 🐳
+
+The Docker build creates a fully static musl binary (~2.6MB):
+
 ```bash
-./build/bench
+# Clone the repo
+git clone https://github.com/relvinarsenio/bench.git
+cd bench
+
+# Build with Docker
+chmod +x build-static.sh
+./build-static.sh
+
+# Run
+./dist/bench
 ```
 
-## 📦 Run via pre-built binary (Recommended)
+#### Build Options
 
-For those who prefer not to compile from source, you can download the pre-built binaries directly from the [Release Page](https://github.com/relvinarsenio/bench/releases/):
-
-**All Distro:**
 ```bash
-curl -L -o bench https://github.com/relvinarsenio/bench/releases/latest/download/bench && chmod +x bench && ./bench
+# Normal build (uses cached Docker image if available)
+./build-static.sh
+
+# Fresh build (removes existing Docker image and rebuilds from scratch)
+./build-static.sh --fresh-build
+
+# Show help
+./build-static.sh --help
 ```
+
+#### Manual Docker Commands
+
+If you prefer to run Docker commands manually:
+
+```bash
+docker build -t bench-builder .
+docker create --name extract bench-builder
+docker cp extract:/src/build/bench ./bench
+docker rm extract
+./bench
+```
+
+---
+
+## 📁 Project Structure
+
+```text
+bench/
+├── CMakeLists.txt          # Main build configuration
+├── Dockerfile              # Docker build for musl static binary
+├── build-static.sh         # Helper script for Docker builds
+├── cmake/
+│   ├── DetectCompiler.cmake # Clang + libc++ detection
+│   └── StaticDeps.cmake    # Builds ALL deps from source with Full LTO
+├── include/                # Header files
+│   ├── cli_renderer.hpp
+│   ├── config.hpp
+│   ├── disk_benchmark.hpp
+│   ├── http_client.hpp
+│   ├── speed_test.hpp
+│   ├── system_info.hpp
+│   └── ...
+└── src/                    # Source files
+    ├── app/main.cpp
+    ├── core/
+    ├── io/
+    ├── net/
+    ├── os/
+    ├── system/
+    └── ui/
+```
+
+### Build Process
+
+1. **Docker Build** (~5-6 min first time):
+   - Uses Alpine Linux with **Clang + libc++ (Full LLVM Stack)**
+   - Downloads zlib, LibreSSL, libcurl, nlohmann/json
+   - Builds all libraries with **Full LTO + -Oz** for maximum performance
+   - Final binary compiled with **-Oz** for size optimization
+   - ICF (Identical Code Folding) enabled for further size reduction
+   - Compiles and links everything statically
+
+2. **Result**: Single static executable (~2.6 MB with musl, stripped)
+
+---
 
 ## 📊 Example Output
 
-```text
+```
 ------------------------------------------------------------------------------
- A Bench Script (C++ Edition v6.9.6)
+ A Bench Script (C++ Edition v7.0.0)
  Usage : ./bench
 ------------------------------------------------------------------------------
  -> CPU & Hardware
@@ -127,11 +191,13 @@ Downloading Speedtest CLI...
  Los Angeles, US        36.35 Mbps        28.20 Mbps        197.47 ms   0.00 %  
  Montreal, CA           42.75 Mbps        21.44 Mbps        273.46 ms   0.00 %  
  Paris, FR              72.95 Mbps        22.23 Mbps        184.56 ms   0.00 %  
- Amsterdam, NL          Error: Cannot open socket
+ Amsterdam, NL          63.13 Mbps        20.63 Mbps        260.96 ms   0.00 %  
  Melbourne, AU          78.91 Mbps        21.80 Mbps        280.85 ms   0.00 %  
 ------------------------------------------------------------------------------
  Finished in        : 213 sec
 ```
+
+---
 
 ## ⚖️ License
 

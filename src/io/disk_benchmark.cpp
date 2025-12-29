@@ -34,6 +34,17 @@ struct AlignedDelete {
     }
 };
 
+struct FileCleaner {
+    std::filesystem::path path;
+
+    ~FileCleaner() {
+        std::error_code ec;
+        if (std::filesystem::exists(path, ec)) {
+            std::filesystem::remove(path, ec);
+        }
+    }
+};
+
 std::unique_ptr<std::byte[], AlignedDelete> make_aligned_buffer(std::size_t size, std::size_t alignment) {
     void* ptr = ::operator new(size, std::align_val_t(alignment));
     return std::unique_ptr<std::byte[], AlignedDelete>(
@@ -77,6 +88,8 @@ std::expected<DiskRunResult, std::string> DiskBenchmark::run_write_test(
     std::stop_token stop) {
     
     const std::string filename(Config::BENCH_FILENAME);
+    FileCleaner cleaner{filename};
+
     const size_t block_size = Config::IO_BLOCK_SIZE;
 
     auto buffer = make_aligned_buffer(block_size, Config::IO_ALIGNMENT);
@@ -94,6 +107,7 @@ std::expected<DiskRunResult, std::string> DiskBenchmark::run_write_test(
          #ifdef O_DIRECT
          flags &= ~O_DIRECT;
          #endif
+         flags |= O_SYNC;
          fd_raw = ::open(filename.c_str(), flags, 0644);
     }
 
@@ -104,7 +118,7 @@ std::expected<DiskRunResult, std::string> DiskBenchmark::run_write_test(
     FileDescriptor fd(fd_raw);
 
     auto start = high_resolution_clock::now();
-    size_t blocks = (size_t(size_mb) * 1024 * 1024) / block_size;
+    size_t blocks = (static_cast<size_t>(size_mb) * 1024 * 1024) / block_size;
 
     for (size_t i = 0; i < blocks; ++i) {
         if (g_interrupted) {
@@ -125,12 +139,12 @@ std::expected<DiskRunResult, std::string> DiskBenchmark::run_write_test(
     }
     if (progress_cb) progress_cb(blocks, blocks, label);
 
-    ::fdatasync(fd.get());
+    if (::fdatasync(fd.get()) == -1) {
+        return std::unexpected("Disk sync failed: " + get_error_message(errno, "sync"));
+    }
+
     auto end = high_resolution_clock::now();
     
-    std::error_code ec; 
-    std::filesystem::remove(filename, ec);
-
     duration<double> diff = end - start;
     double speed = diff.count() <= 0 ? 0.0 : static_cast<double>(size_mb) / diff.count();
     
