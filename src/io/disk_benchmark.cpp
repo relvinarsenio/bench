@@ -118,7 +118,7 @@ std::expected<DiskRunResult, std::string> DiskBenchmark::run_write_test(
     FileDescriptor fd(fd_raw);
 
     auto start = high_resolution_clock::now();
-    size_t blocks = (size_t(size_mb) * 1024 * 1024) / block_size;
+    size_t blocks = (static_cast<size_t>(size_mb) * 1024 * 1024) / block_size;
 
     for (size_t i = 0; i < blocks; ++i) {
         if (g_interrupted) {

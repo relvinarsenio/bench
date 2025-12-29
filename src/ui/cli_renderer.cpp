@@ -86,7 +86,7 @@ void render_speed_results(const SpeedTestResult& result) {
             Color::YELLOW, " " + entry.node_name,
             Color::GREEN, format_speed(entry.download_mbps),
             Color::RED,   format_speed(entry.upload_mbps),
-            Color::CYAN,  std::format("{:.2f} ms", entry.latency_ms),
+            Color::CYAN,  latency_str,
             Color::RED,   entry.loss.empty() ? "-" : entry.loss,
             Color::RESET);
     }
