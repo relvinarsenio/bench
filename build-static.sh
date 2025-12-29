@@ -10,7 +10,21 @@ cd "$SCRIPT_DIR"
 IMAGE_NAME="bench-builder"
 
 # =============================================================================
-# Parse Arguments
+# 0. Trap / Auto-Cleanup on Interrupt
+# =============================================================================
+cleanup_on_interrupt() {
+    echo ""
+    echo "🛑  Build cancelled by user (Ctrl+C)!"
+    echo "🧹  Cleaning up dangling images as requested..."
+    docker image prune -f
+    echo "✨  Cleanup complete. No leftovers."
+    exit 1
+}
+
+trap cleanup_on_interrupt SIGINT
+
+# =============================================================================
+# 1. Parse Arguments
 # =============================================================================
 FRESH_BUILD=false
 
@@ -20,12 +34,8 @@ show_help() {
     echo "Build a fully static musl binary using Docker."
     echo ""
     echo "Options:"
-    echo "  --fresh-build    Remove existing Docker image and rebuild from scratch"
+    echo "  --fresh-build    Force rebuild from scratch (no cache)"
     echo "  -h, --help       Show this help message"
-    echo ""
-    echo "Example:"
-    echo "  $0               # Normal build (uses cached image if available)"
-    echo "  $0 --fresh-build # Clean build (removes existing image first)"
 }
 
 for arg in "$@"; do
@@ -47,37 +57,60 @@ for arg in "$@"; do
 done
 
 # =============================================================================
-# Fresh Build: Remove existing image
+# 2. Build Configuration
 # =============================================================================
+DOCKER_ARGS=""
+OLD_IMAGE_ID=""
+
 if [ "$FRESH_BUILD" = true ]; then
-    echo "🗑️  Fresh build requested, removing existing Docker image..."
-    docker rmi -f "$IMAGE_NAME" 2>/dev/null || true
+    echo "🗑️  Fresh build requested (No Cache Mode)..."
+    OLD_IMAGE_ID="$(docker images -q "$IMAGE_NAME" 2>/dev/null)"
+    DOCKER_ARGS="--no-cache"
     echo ""
 fi
 
 echo "🐳 Building static binary with Docker (Alpine/musl)..."
 echo "=============================================="
 
-# Create dist directory
-mkdir -p dist
+# Build using Docker
+docker build $DOCKER_ARGS --target builder -t "$IMAGE_NAME" .
 
-# Build using Docker (target builder stage only)
-docker build --target builder -t "$IMAGE_NAME" .
+# =============================================================================
+# 3. Cleanup Phase (On Success)
+# =============================================================================
+if [ "$FRESH_BUILD" = true ] && [ -n "$OLD_IMAGE_ID" ]; then
+    NEW_IMAGE_ID="$(docker images -q "$IMAGE_NAME" 2>/dev/null)"
+    if [ "$OLD_IMAGE_ID" != "$NEW_IMAGE_ID" ]; then
+        echo ""
+        echo "🧹 Cleaning up old dangling image ($OLD_IMAGE_ID)..."
+        docker rmi "$OLD_IMAGE_ID" >/dev/null 2>&1 || true
+        echo "✨ Old image removed."
+    fi
+fi
 
-# Extract the binary
+# =============================================================================
+# 4. Extraction Phase
+# =============================================================================
 echo ""
 echo "📦 Extracting binary..."
+
+# FIX: Create directory RIGHT HERE to guarantee it exists
+mkdir -p "$SCRIPT_DIR/dist"
+
 docker rm -f bench-extract 2>/dev/null || true
 docker create --name bench-extract "$IMAGE_NAME" /bin/true
-docker cp bench-extract:/src/build/bench ./dist/bench
+
+# Copy to explicit path
+docker cp bench-extract:/src/build/bench "$SCRIPT_DIR/dist/bench"
+
 docker rm bench-extract
 
 # Show results
 echo ""
 echo "✅ Build complete!"
 echo "=============================================="
-file ./dist/bench
-ls -lh ./dist/bench
+file "$SCRIPT_DIR/dist/bench"
+ls -lh "$SCRIPT_DIR/dist/bench"
 echo ""
 echo "Binary location: ./dist/bench"
 echo ""
