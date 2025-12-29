@@ -31,7 +31,9 @@ using json = nlohmann::json;
 class LibCurlContext {
 public:
     LibCurlContext() {
-        OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, nullptr);
+        if (OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, nullptr) == 0) {
+            throw std::runtime_error("Failed to initialize OpenSSL crypto library");
+        }
         
         if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
             throw std::runtime_error("Failed to initialize libcurl globally");

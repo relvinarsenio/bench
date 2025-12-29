@@ -13,5 +13,9 @@ namespace Config {
     constexpr long HTTP_TIMEOUT_SEC = 10;
     constexpr long HTTP_CONNECT_TIMEOUT_SEC = 10;
     constexpr long SPEEDTEST_DL_TIMEOUT_SEC = 60;
+
+    constexpr long CHECK_CONN_TIMEOUT_SEC = 5;
+    constexpr long CHECK_CONN_CONNECT_TIMEOUT_SEC = 3;
+
     constexpr int UI_SPINNER_DELAY_MS = 150;
 }

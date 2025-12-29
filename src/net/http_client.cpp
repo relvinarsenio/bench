@@ -171,8 +171,8 @@ bool HttpClient::check_connectivity(const std::string& host) {
         curl_easy_reset(handle_.get());
         curl_easy_setopt(handle_.get(), CURLOPT_URL, ("http://" + host).c_str());
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
-        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, 5L);
-        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, 3L);
+        curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::CHECK_CONN_TIMEOUT_SEC);
+        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
         curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, kUserAgent);
         curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_FORBID_REUSE, 1L);
