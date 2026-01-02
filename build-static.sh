@@ -15,13 +15,14 @@ IMAGE_NAME="bench-builder"
 cleanup_on_interrupt() {
     echo ""
     echo "🛑  Build cancelled by user (Ctrl+C)!"
-    echo "🧹  Cleaning up dangling images as requested..."
-    docker image prune -f
+    echo "🧹  Cleaning up dangling images and containers..."
+    docker image prune -f >/dev/null 2>&1 || true
+    docker container prune -f >/dev/null 2>&1 || true
     echo "✨  Cleanup complete. No leftovers."
     exit 1
 }
 
-trap cleanup_on_interrupt SIGINT
+trap cleanup_on_interrupt SIGINT SIGTERM
 
 # =============================================================================
 # 1. Parse Arguments
@@ -59,6 +60,7 @@ done
 # =============================================================================
 # 2. Build Configuration
 # =============================================================================
+DOCKER_ARGS_BASE="--force-rm"
 DOCKER_ARGS=""
 OLD_IMAGE_ID=""
 
@@ -73,7 +75,7 @@ echo "🐳 Building static binary with Docker (Alpine/musl)..."
 echo "=============================================="
 
 # Build using Docker
-docker build $DOCKER_ARGS --target builder -t "$IMAGE_NAME" .
+docker build $DOCKER_ARGS_BASE $DOCKER_ARGS --target builder -t "$IMAGE_NAME" .
 
 # =============================================================================
 # 3. Cleanup Phase (On Success)

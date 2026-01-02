@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -15,5 +17,6 @@ public:
     ShellPipe(const ShellPipe&) = delete;
     ShellPipe& operator=(const ShellPipe&) = delete;
 
-    std::string read_all();
+    std::string read_all(std::chrono::milliseconds timeout = std::chrono::seconds(60),
+                         std::stop_token stop = {});
 };

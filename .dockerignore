@@ -1,0 +1,9 @@
+dist/
+build/
+.git/
+.gitignore
+.vscode/
+*.swp
+*.swo
+.idea/
+**/__pycache__/
