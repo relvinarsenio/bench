@@ -152,27 +152,33 @@ std::expected<void, std::string> run_uring_io(
             return std::unexpected(uring_error(wait_rc, "wait"));
         }
 
-        if (cqe) {
+        unsigned head;
+        unsigned count = 0;
+
+        io_uring_for_each_cqe(&ring, head, cqe) {
+            count++;
+            
             auto expected_len = static_cast<int>(io_uring_cqe_get_data64(cqe));
 
             if (cqe->res < 0) {
+                io_uring_cq_advance(&ring, count); // Wajib advance sebelum return
                 std::string op = is_write ? "write" : "read";
-                io_uring_cqe_seen(&ring, cqe);
                 return std::unexpected("Benchmark failed: " + get_error_message(-cqe->res, op));
             }
 
             if (cqe->res != expected_len) {
-                io_uring_cqe_seen(&ring, cqe);
+                io_uring_cq_advance(&ring, count); // Wajib advance sebelum return
                 std::string op = is_write ? "write" : "read";
                 return std::unexpected(std::format("Benchmark failed: Partial {} (expected {} bytes, got {})", op, expected_len, cqe->res));
             }
 
-            io_uring_cqe_seen(&ring, cqe);
             ++completed;
             if (progress_cb && completed % 2 == 0) {
                 progress_cb(static_cast<std::size_t>(completed), static_cast<std::size_t>(total_blocks), label);
             }
         }
+
+        io_uring_cq_advance(&ring, count);
 
         if (high_resolution_clock::now() > deadline) {
             return std::unexpected("Benchmark timed out (operation took too long)");
@@ -305,8 +311,13 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
                     do {
                         written = ::pwrite(fd.get(), buffer.get(), chunk, offset);
                     } while (written < 0 && errno == EINTR);
-                    if (written != static_cast<ssize_t>(chunk)) {
+
+                    if (written < 0) {
                         return std::unexpected("Benchmark failed: " + get_error_message(errno, "write"));
+                    }
+
+                    if (static_cast<size_t>(written) != chunk) {
+                        return std::unexpected(std::format("Benchmark failed: Partial write (expected {} bytes, got {})", chunk, written));
                     }
 
                     if (high_resolution_clock::now() > deadline) {
@@ -430,6 +441,10 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
                 }
                 if (r == 0) {
                     return std::unexpected("Benchmark failed: Unexpected EOF during read");
+                }
+
+                if (static_cast<size_t>(r) != chunk) {
+                    return std::unexpected(std::format("Benchmark failed: Partial read (expected {} bytes, got {})", chunk, r));
                 }
 
                 if (high_resolution_clock::now() > deadline) {

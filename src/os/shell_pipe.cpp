@@ -158,9 +158,11 @@ std::string ShellPipe::read_all(std::chrono::milliseconds timeout, std::stop_tok
         if (remaining_ms <= 0) {
             ::kill(pid_, SIGTERM);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            ::kill(pid_, SIGKILL);
+            int status;
+            if (::waitpid(pid_, &status, WNOHANG) == 0) {
+                ::kill(pid_, SIGKILL);
+            }
 
-            int status = 0;
             ::waitpid(pid_, &status, 0);
             pid_ = -1;
 
