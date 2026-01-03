@@ -185,12 +185,12 @@ void run_app(std::string_view app_path) {
                 bar += (i < filled) ? style.fill : style.empty;
             }
 
-            std::print("\r {:<{}} [{}] {:3}%", lbl, io_label_width, bar, percent);
+            std::print("\r\x1b[2K {:<{}} [{}] {:3}%", lbl, io_label_width, bar, percent);
             std::cout << std::flush;
         };
 
         auto result = DiskBenchmark::run_io_test(Config::DISK_TEST_SIZE_MB, label, progress_cb);
-        std::print("\r{:<110}\r", "");
+        std::print("\r\x1b[2K");
         std::cout << std::flush;
         
         if (result) {

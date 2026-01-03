@@ -59,7 +59,7 @@ public:
                 std::this_thread::sleep_for(std::chrono::milliseconds(Config::UI_SPINNER_DELAY_MS));
             }
 
-            std::print("\r{:<48}\r", "");
+            std::print("\r\x1b[2K");
             std::cout.flush();
         });
     }
