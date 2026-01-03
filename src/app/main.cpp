@@ -181,8 +181,8 @@ void run_app(std::string_view app_path) {
 
             std::string bar;
             bar.reserve(style.width * static_cast<int>(style.fill.size()));
-            for (int i = 0; i < style.width; ++i) {
-                bar += (i < filled) ? style.fill : style.empty;
+            for (int j = 0; j < style.width; ++j) {
+                bar += (j < filled) ? style.fill : style.empty;
             }
 
             std::print("\r\x1b[2K {:<{}} [{}] {:3}%", lbl, io_label_width, bar, percent);
