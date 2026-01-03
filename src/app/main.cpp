@@ -68,7 +68,7 @@ void run_app(std::string_view app_path) {
     std::print("\033c");
     std::cout << std::flush;
     print_line();
-    std::println(" A Bench Script (C++ Edition v7.0.0)");
+    std::println(" A Bench Script (C++ Edition v7.1.1)");
     std::println(" Usage : ./{}", app_name);
     print_line();
 
