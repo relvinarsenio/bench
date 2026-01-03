@@ -116,7 +116,7 @@ void SpeedTest::install() {
     };
     
     ShellPipe pipe(tar_args);
-    pipe.read_all(std::chrono::seconds(60)); // fail fast if extraction hangs
+    pipe.read_all(std::chrono::milliseconds(60000));
 
     if (!fs::exists(cli_path_)) throw std::runtime_error("Failed to extract speedtest-cli");
     fs::permissions(cli_path_, fs::perms::owner_all, fs::perm_options::add);
@@ -158,7 +158,7 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
             try {
                 ShellPipe pipe(cmd_args);
-                std::string output = pipe.read_all(std::chrono::seconds(90));
+                std::string output = pipe.read_all(std::chrono::milliseconds(90000));
             
             if (g_interrupted) {
                 entry.success = false;
