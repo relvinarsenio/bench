@@ -145,10 +145,10 @@ bench/
 ## 📊 Example Output
 
 ```
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
  A Bench Script (C++ Edition v7.1.1)
  Usage : ./bench
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
  -> CPU & Hardware
  CPU Model            : AMD Ryzen 5 7535HS with Radeon Graphics
  CPU Cores            : 4 @ 3824.4 MHz
@@ -177,13 +177,13 @@ bench/
  ISP                  : AS7713 PT TELKOM INDONESIA
  Location             : Bandar Lampung / ID
  Region               : Lampung
-------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Running I/O Test (1GB File)...
- I/O Speed (Run #1) : 2197.1 MB/s
- I/O Speed (Run #2) : 2573.6 MB/s
- I/O Speed (Run #3) : 4554.3 MB/s
- I/O Speed (Average) : 3108.3 MB/s
-------------------------------------------------------------------------------
+  I/O Speed (Run #1)   : Write   2178.3 MB/s   Read   4547.5 MB/s
+  I/O Speed (Run #2)   : Write   2465.7 MB/s   Read   4566.6 MB/s
+  I/O Speed (Run #3)   : Write   3206.2 MB/s   Read   4562.0 MB/s
+  I/O Speed (Average)  : Write   2616.7 MB/s   Read   4558.7 MB/s
+--------------------------------------------------------------------------------
 Downloading Speedtest CLI...
  Node Name              Download          Upload            Latency     Loss    
  Speedtest.net (Auto)   76.66 Mbps        21.53 Mbps        23.88 ms    6.19 %  
@@ -193,8 +193,8 @@ Downloading Speedtest CLI...
  Paris, FR              72.95 Mbps        22.23 Mbps        184.56 ms   0.00 %  
  Amsterdam, NL          63.13 Mbps        20.63 Mbps        260.96 ms   0.00 %  
  Melbourne, AU          78.91 Mbps        21.80 Mbps        280.85 ms   0.00 %  
-------------------------------------------------------------------------------
- Finished in        : 213 sec
+--------------------------------------------------------------------------------
+ Finished in        : 3 min 33 sec
 ```
 
 ---
