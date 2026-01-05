@@ -4,9 +4,10 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */                                                                                                \
+ */
 #include "include/speed_test.hpp"
 
+#include <array>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -33,6 +34,19 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 namespace {
+
+struct Node {
+    std::string_view id;
+    std::string_view name;
+};
+
+constexpr std::array<Node, 7> SERVERS = {{{"", "Speedtest.net (Auto)"},
+                                          {"59016", "Singapore, SG"},
+                                          {"5905", "Los Angeles, US"},
+                                          {"59219", "Montreal, CA"},
+                                          {"41840", "Paris, FR"},
+                                          {"3386", "Amsterdam, NL"},
+                                          {"46114", "Melbourne, AU"}}};
 
 class SpinnerScope {
     const SpinnerCallback& cb_;
@@ -137,19 +151,12 @@ void SpeedTest::install() {
 }
 
 SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
-    struct Node {
-        std::string id;
-        std::string name;
-    };
-
-    std::vector<Node> nodes = {{"", "Speedtest.net (Auto)"}, {"59016", "Singapore, SG"},
-                               {"5905", "Los Angeles, US"},  {"59219", "Montreal, CA"},
-                               {"41840", "Paris, FR"},       {"3386", "Amsterdam, NL"},
-                               {"46114", "Melbourne, AU"}};
 
     SpeedTestResult result;
 
-    for (const auto& node : nodes) {
+    result.entries.reserve(SERVERS.size());
+
+    for (const auto& node : SERVERS) {
         if (g_interrupted)
             break;
 
@@ -159,12 +166,12 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
                                              "--accept-gdpr"};
 
         if (!node.id.empty()) {
-            cmd_args.push_back("--server-id=" + node.id);
+            cmd_args.push_back(std::format("--server-id={}", node.id));
         }
 
         SpeedEntryResult entry;
-        entry.server_id = node.id;
-        entry.node_name = node.name;
+        entry.server_id = std::string(node.id);
+        entry.node_name = std::string(node.name);
 
         try {
             ShellPipe pipe(cmd_args);
