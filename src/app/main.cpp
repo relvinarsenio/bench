@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <iostream>
 #include <print>
 #include <string>
 #include <string_view>
@@ -71,10 +70,11 @@ void run_app(std::string_view app_path) {
     if (app_name.empty())
         app_name = "bench";
 
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+
     std::print("\033c");
-    std::cout << std::flush;
     print_line();
-    std::println(" A Bench Script (C++ Edition v7.1.1)");
+    std::println(" A Bench Script (C++ Edition v7.1.2)");
     std::println(" Usage : ./{}", app_name);
     print_line();
 
@@ -210,12 +210,10 @@ void run_app(std::string_view app_path) {
             }
 
             std::print("\r\x1b[2K {:<{}} [{}] {:3}%", lbl, io_label_width, bar, percent);
-            std::cout << std::flush;
         };
 
         auto result = DiskBenchmark::run_io_test(Config::DISK_TEST_SIZE_MB, label, progress_cb);
         std::print("\r\x1b[2K");
-        std::cout << std::flush;
 
         if (result) {
             std::println(
@@ -225,7 +223,7 @@ void run_app(std::string_view app_path) {
                 Color::colorize(std::format("Read {:>8.1f} MB/s", result->read_mbps), Color::CYAN));
             disk_runs.push_back(*result);
         } else {
-            std::println("\r{}[!] Disk Benchmark Skipped: {}{}", Color::RED, result.error(),
+            std::println("\r{}[!] Disk Benchmark Aborted: {}{}", Color::RED, result.error(),
                          Color::RESET);
             disk_error = true;
             break;

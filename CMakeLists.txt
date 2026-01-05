@@ -6,7 +6,7 @@ cmake_policy(SET CMP0135 NEW)
 # =============================================================================
 # Bench - Modern Linux Server Benchmark
 # =============================================================================
-project(bench VERSION 7.1.1 LANGUAGES CXX C)
+project(bench VERSION 7.1.2 LANGUAGES CXX C)
 
 # C++23 Required
 set(CMAKE_CXX_STANDARD 23)
