@@ -243,6 +243,12 @@ void run_app(std::string_view app_path) {
         std::println(" {:<{}}: {}   {}", " I/O Speed (Average)", io_label_width,
                      Color::colorize(std::format("Write {:>8.1f} MB/s", avg_w), Color::YELLOW),
                      Color::colorize(std::format("Read {:>8.1f} MB/s", avg_r), Color::CYAN));
+
+        std::println(
+            "{}",
+            Color::colorize(
+                "Note: Write speed reflects real disk commit speed, not temporary cache speed.",
+                Color::BOLD));
     }
 
     print_line();
