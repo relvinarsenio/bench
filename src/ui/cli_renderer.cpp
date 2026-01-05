@@ -1,5 +1,13 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #include "include/cli_renderer.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdlib>
@@ -8,8 +16,6 @@
 #include <memory>
 #include <print>
 #include <span>
-#include <algorithm>
-#include <chrono>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -25,32 +31,28 @@ namespace CliRenderer {
 namespace {
 
 bool check_str_utf8(const char* env) {
-    if (!env || !*env) return false;
-    
+    if (!env || !*env)
+        return false;
+
     std::string s(env);
-    std::transform(s.begin(), s.end(), s.begin(), 
-        [](unsigned char c){ return std::tolower(c); });
-    
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+
     return s.find("utf-8") != std::string::npos || s.find("utf8") != std::string::npos;
 }
 
 bool is_utf8_term() {
-    // 1. Cek Raja (LC_ALL) - Kalau diset, dia override semua.
     if (const char* val = std::getenv("LC_ALL"); val && *val) {
         return check_str_utf8(val);
     }
-    
-    // 2. Cek Patih (LC_CTYPE) - Spesifik buat karakter.
+
     if (const char* val = std::getenv("LC_CTYPE"); val && *val) {
         return check_str_utf8(val);
     }
-    
-    // 3. Cek Rakyat (LANG) - Fallback terakhir.
+
     if (const char* val = std::getenv("LANG"); val && *val) {
         return check_str_utf8(val);
     }
-    
-    // Default: ASCII (Safe Mode) biar gak rusak tampilannya
+
     return false;
 }
 
@@ -68,25 +70,26 @@ public:
         auto selected = [] {
             static constexpr std::array<const char*, 10> utf_frames = {
                 "\u280B", "\u2819", "\u2839", "\u2838", "\u283C",
-                "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"
-            };
+                "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"};
             static constexpr std::array<const char*, 4> ascii_frames = {"|", "/", "-", "\\"};
 
             return is_utf8_term() ? std::span<const char* const>(utf_frames)
                                   : std::span<const char* const>(ascii_frames);
-
         }();
 
         frames_ = selected;
 
         worker_ = std::jthread([this](std::stop_token st) {
             std::size_t idx = 0;
-            
+
             while (!st.stop_requested()) {
-                double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
-                std::print("\r {:<28} {} {:4.1f}s", text_, frames_[idx++ % frames_.size()], elapsed);
+                double elapsed =
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start_)
+                        .count();
+                std::print("\r {:<28} {} {:4.1f}s", text_, frames_[idx++ % frames_.size()],
+                           elapsed);
                 std::cout.flush();
-                
+
                 std::this_thread::sleep_for(std::chrono::milliseconds(Config::UI_SPINNER_DELAY_MS));
             }
 
@@ -95,12 +98,10 @@ public:
         });
     }
 
-    void stop() {
-        worker_ = std::jthread();
-    }
+    void stop() { worker_ = std::jthread(); }
 };
 
-}
+} // namespace
 
 std::string format_speed(double mbps) {
     if (mbps >= 1000.0) {
@@ -110,27 +111,25 @@ std::string format_speed(double mbps) {
 }
 
 void render_speed_results(const SpeedTestResult& result) {
-    std::println("{:<24}{:<18}{:<18}{:<12}{:<8}", " Node Name", "Download", "Upload", "Latency", "Loss");
+    std::println("{:<24}{:<18}{:<18}{:<12}{:<8}", " Node Name", "Download", "Upload", "Latency",
+                 "Loss");
     for (const auto& entry : result.entries) {
         if (!entry.success) {
             std::string err = entry.error;
-            if (err.length() > 45) err = err.substr(0, 42) + "...";
-            std::print("{}{: <24}{}Error: {}{}\n",
-                Color::YELLOW, " " + entry.node_name, Color::RED, err, Color::RESET);
+            if (err.length() > 45)
+                err = err.substr(0, 42) + "...";
+            std::print("{}{: <24}{}Error: {}{}\n", Color::YELLOW, " " + entry.node_name, Color::RED,
+                       err, Color::RESET);
             continue;
         }
 
-        std::string latency_str = (entry.latency_ms > 0.0) 
-            ? std::format("{:.2f} ms", entry.latency_ms) 
-            : "-";
+        std::string latency_str =
+            (entry.latency_ms > 0.0) ? std::format("{:.2f} ms", entry.latency_ms) : "-";
 
-        std::print("{}{: <24}{}{:<18}{}{:<18}{}{:<12}{}{:<8}{}\n",
-            Color::YELLOW, " " + entry.node_name,
-            Color::GREEN, format_speed(entry.download_mbps),
-            Color::RED,   format_speed(entry.upload_mbps),
-            Color::CYAN,  latency_str,
-            Color::RED,   entry.loss.empty() ? "-" : entry.loss,
-            Color::RESET);
+        std::print("{}{: <24}{}{:<18}{}{:<18}{}{:<12}{}{:<8}{}\n", Color::YELLOW,
+                   " " + entry.node_name, Color::GREEN, format_speed(entry.download_mbps),
+                   Color::RED, format_speed(entry.upload_mbps), Color::CYAN, latency_str,
+                   Color::RED, entry.loss.empty() ? "-" : entry.loss, Color::RESET);
     }
 }
 
@@ -138,14 +137,14 @@ SpinnerCallback make_spinner_callback() {
     auto spinner = std::make_shared<UiSpinner>();
     return [spinner](SpinnerEvent ev, std::string_view label) {
         switch (ev) {
-            case SpinnerEvent::Start:
-                spinner->start(label);
-                break;
-            case SpinnerEvent::Stop:
-                spinner->stop();
-                break;
+        case SpinnerEvent::Start:
+            spinner->start(label);
+            break;
+        case SpinnerEvent::Stop:
+            spinner->stop();
+            break;
         }
     };
 }
 
-}
+} // namespace CliRenderer

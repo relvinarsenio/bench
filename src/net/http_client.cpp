@@ -1,21 +1,29 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #include "include/http_client.hpp"
-#include "include/interrupts.hpp"
 #include "include/config.hpp"
 #include "include/embedded_cert.hpp"
+#include "include/interrupts.hpp"
 
+#include <array>
 #include <cerrno>
+#include <curl/curl.h>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <curl/curl.h>
 #include <span>
-#include <array>
 
 namespace {
 
 struct CurlSlistDeleter {
     void operator()(struct curl_slist* list) const noexcept {
-        if (list) curl_slist_free_all(list);
+        if (list)
+            curl_slist_free_all(list);
     }
 };
 
@@ -34,11 +42,14 @@ public:
 };
 
 void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
-    headers.add("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+    headers.add("Accept: "
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/"
+                "apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
     headers.add("Accept-Language: en-US,en;q=0.9");
     headers.add("Cache-Control: max-age=0");
     headers.add("Connection: keep-alive");
-    headers.add("Sec-Ch-Ua: \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"");
+    headers.add(
+        "Sec-Ch-Ua: \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"");
     headers.add("Sec-Ch-Ua-Mobile: ?0");
     headers.add("Sec-Ch-Ua-Platform: \"Windows\"");
     headers.add("Sec-Fetch-Dest: document");
@@ -58,19 +69,20 @@ void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
     curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &blob);
 }
 
-}
+} // namespace
 
 HttpClient::HttpClient() : handle_(curl_easy_init(), curl_easy_cleanup) {
-    if (!handle_) throw std::runtime_error("Failed to create curl handle");
+    if (!handle_)
+        throw std::runtime_error("Failed to create curl handle");
 }
 
 size_t HttpClient::write_string(void* ptr, size_t size, size_t nmemb, std::string* s) noexcept {
     try {
         size_t total_size = size * nmemb;
         std::span<const char> data_view(static_cast<const char*>(ptr), total_size);
-        
+
         s->append(data_view.begin(), data_view.end());
-        
+
         return total_size;
     } catch (...) {
         return 0;
@@ -81,10 +93,11 @@ size_t HttpClient::write_file(void* ptr, size_t size, size_t nmemb, std::ofstrea
     try {
         size_t total_size = size * nmemb;
         std::span<const char> data_view(static_cast<const char*>(ptr), total_size);
-        
+
         f->write(data_view.data(), static_cast<std::streamsize>(data_view.size()));
-        
-        if (!*f) return 0;
+
+        if (!*f)
+            return 0;
         return total_size;
     } catch (...) {
         return 0;
@@ -102,16 +115,17 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEFUNCTION, write_string);
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
-    
+
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::HTTP_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::HTTP_CONNECT_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_TCP_KEEPALIVE, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
-    curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
+    curl_easy_setopt(
+        handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
-                return g_interrupted ? 1 : 0;
+            return g_interrupted ? 1 : 0;
         });
     curl_easy_setopt(handle_.get(), CURLOPT_NOPROGRESS, 0L);
 
@@ -124,13 +138,14 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     return response;
 }
 
-std::expected<void, std::string> HttpClient::download(const std::string& url, const std::string& filepath) {
+std::expected<void, std::string> HttpClient::download(const std::string& url,
+                                                      const std::string& filepath) {
     curl_easy_reset(handle_.get());
 
     std::ofstream outfile(filepath, std::ios::binary);
     if (!outfile) {
-        return std::unexpected(std::format("Cannot save file '{}': {}", 
-            filepath, std::system_category().message(errno)));
+        return std::unexpected(std::format("Cannot save file '{}': {}", filepath,
+                                           std::system_category().message(errno)));
     }
 
     CurlHeaders headers;
@@ -140,15 +155,16 @@ std::expected<void, std::string> HttpClient::download(const std::string& url, co
     curl_easy_setopt(handle_.get(), CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEFUNCTION, write_file);
     curl_easy_setopt(handle_.get(), CURLOPT_WRITEDATA, &outfile);
-    
+
     curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::SPEEDTEST_DL_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::HTTP_CONNECT_TIMEOUT_SEC);
     curl_easy_setopt(handle_.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
-    curl_easy_setopt(handle_.get(), CURLOPT_XFERINFOFUNCTION,
+    curl_easy_setopt(
+        handle_.get(), CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
-                return g_interrupted ? 1 : 0;
+            return g_interrupted ? 1 : 0;
         });
     curl_easy_setopt(handle_.get(), CURLOPT_NOPROGRESS, 0L);
 
@@ -160,8 +176,8 @@ std::expected<void, std::string> HttpClient::download(const std::string& url, co
         std::filesystem::remove(filepath);
         return std::unexpected(std::format("Download failed: {}", curl_easy_strerror(res)));
     }
-    
-    return {}; 
+
+    return {};
 }
 
 bool HttpClient::check_connectivity(const std::string& host) {
@@ -170,7 +186,8 @@ bool HttpClient::check_connectivity(const std::string& host) {
         curl_easy_setopt(handle_.get(), CURLOPT_URL, ("http://" + host).c_str());
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::CHECK_CONN_TIMEOUT_SEC);
-        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
+        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT,
+                         Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
         curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, Config::HTTP_USER_AGENT.data());
         curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_FORBID_REUSE, 1L);

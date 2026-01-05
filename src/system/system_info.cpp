@@ -1,17 +1,24 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #include "include/system_info.hpp"
 #include "include/utils.hpp"
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cctype>
+#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -27,26 +34,28 @@
 namespace fs = std::filesystem;
 
 namespace {
-    bool is_starts_with_ic(std::string_view str, std::string_view prefix) {
-        if (str.size() < prefix.size()) return false;
-        return std::equal(prefix.begin(), prefix.end(), str.begin(), 
-            [](char a, char b) {
-                return std::tolower(static_cast<unsigned char>(a)) == 
-                       std::tolower(static_cast<unsigned char>(b));
-            });
-    }
-
-    std::string capitalize(std::string_view s) {
-        if (s.empty()) return {};
-        std::string ret(s);
-        ret[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(ret[0])));
-        if (ret == "Zram") return "ZRAM";
-        return ret;
-    }
+bool is_starts_with_ic(std::string_view str, std::string_view prefix) {
+    if (str.size() < prefix.size())
+        return false;
+    return std::equal(prefix.begin(), prefix.end(), str.begin(), [](char a, char b) {
+        return std::tolower(static_cast<unsigned char>(a)) ==
+               std::tolower(static_cast<unsigned char>(b));
+    });
 }
 
+std::string capitalize(std::string_view s) {
+    if (s.empty())
+        return {};
+    std::string ret(s);
+    ret[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(ret[0])));
+    if (ret == "Zram")
+        return "ZRAM";
+    return ret;
+}
+} // namespace
+
 const std::string& SystemInfo::get_cpuinfo_cache() {
-    static const std::string cache = []{
+    static const std::string cache = [] {
         std::ifstream f("/proc/cpuinfo");
         std::stringstream buffer;
         buffer << f.rdbuf();
@@ -56,38 +65,40 @@ const std::string& SystemInfo::get_cpuinfo_cache() {
 }
 
 std::string SystemInfo::get_model_name() {
-    #if defined(__i386__) || defined(__x86_64__)
-        unsigned int max_ext = __get_cpuid_max(0x80000000, nullptr);
-        if (max_ext >= 0x80000004) {
-            std::array<unsigned int, 12> data{};
-            __cpuid(0x80000002, data[0], data[1], data[2], data[3]);
-            __cpuid(0x80000003, data[4], data[5], data[6], data[7]);
-            __cpuid(0x80000004, data[8], data[9], data[10], data[11]);
-            
-            std::string brand;
-            brand.resize(48);
-            std::memcpy(brand.data(), data.data(), std::min(brand.size(), sizeof(data)));
-            
-            if (auto pos = brand.find('\0'); pos != std::string::npos) {
-                brand.resize(pos);
-            }
+#if defined(__i386__) || defined(__x86_64__)
+    unsigned int max_ext = __get_cpuid_max(0x80000000, nullptr);
+    if (max_ext >= 0x80000004) {
+        std::array<unsigned int, 12> data{};
+        __cpuid(0x80000002, data[0], data[1], data[2], data[3]);
+        __cpuid(0x80000003, data[4], data[5], data[6], data[7]);
+        __cpuid(0x80000004, data[8], data[9], data[10], data[11]);
 
-            brand = trim(brand);
-            if (!brand.empty()) return brand;
+        std::string brand;
+        brand.resize(48);
+        std::memcpy(brand.data(), data.data(), std::min(brand.size(), sizeof(data)));
+
+        if (auto pos = brand.find('\0'); pos != std::string::npos) {
+            brand.resize(pos);
         }
-    #endif
+
+        brand = trim(brand);
+        if (!brand.empty())
+            return brand;
+    }
+#endif
 
     std::stringstream ss(get_cpuinfo_cache());
     std::string line;
     const std::array<std::string, 5> keys = {"model name", "hardware", "processor", "cpu", "Model"};
-    
+
     while (std::getline(ss, line)) {
         for (const auto& k : keys) {
             if (is_starts_with_ic(line, k)) {
                 auto colon = line.find(':');
                 if (colon != std::string::npos) {
                     auto model = trim(line.substr(colon + 1));
-                    if (!model.empty()) return model;
+                    if (!model.empty())
+                        return model;
                 }
             }
         }
@@ -98,12 +109,14 @@ std::string SystemInfo::get_model_name() {
         std::string model;
         if (std::getline(dt, model)) {
             model = trim(model);
-            if (!model.empty()) return model;
+            if (!model.empty())
+                return model;
         }
     }
 
     struct utsname buf{};
-    if (::uname(&buf) == 0) return std::string(buf.machine);
+    if (::uname(&buf) == 0)
+        return std::string(buf.machine);
     return "Unknown CPU";
 }
 
@@ -112,7 +125,7 @@ std::string SystemInfo::get_cpu_cores_freq() {
     double freq_mhz = 0.0;
 
     std::ifstream f("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
-    
+
     std::string line;
     if (f >> line) {
         uint64_t val = 0;
@@ -120,18 +133,19 @@ std::string SystemInfo::get_cpu_cores_freq() {
         if (ec == std::errc()) {
             freq_mhz = static_cast<double>(val) / 1000.0;
         }
-    } 
+    }
 
     if (freq_mhz == 0.0) {
         std::stringstream ss(get_cpuinfo_cache());
-        while(std::getline(ss, line)) {
+        while (std::getline(ss, line)) {
             if (line.starts_with("cpu MHz")) {
                 auto colon = line.find(':');
                 if (colon != std::string::npos) {
                     std::string_view val_str = trim_sv(std::string_view(line).substr(colon + 1));
-                    auto [ptr, ec] = std::from_chars(val_str.data(), val_str.data() + val_str.size(), freq_mhz);
+                    auto [ptr, ec] =
+                        std::from_chars(val_str.data(), val_str.data() + val_str.size(), freq_mhz);
                     if (ec == std::errc()) {
-                         break;
+                        break;
                     }
                 }
             }
@@ -143,33 +157,42 @@ std::string SystemInfo::get_cpu_cores_freq() {
 std::string SystemInfo::get_cpu_cache() {
     auto parse_cache = [](std::string s) -> std::string {
         s = trim(s);
-        if (s.empty()) return "Unknown";
-        
+        if (s.empty())
+            return "Unknown";
+
         uint64_t size = 0;
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), size);
-        
-        if (ec != std::errc()) return s; 
+
+        if (ec != std::errc())
+            return s;
 
         if (ptr < s.data() + s.size()) {
             char suffix = static_cast<char>(std::toupper(static_cast<unsigned char>(*ptr)));
-            if (suffix == 'K') size *= 1024;
-            else if (suffix == 'M') size *= 1024 * 1024;
+            if (suffix == 'K')
+                size *= 1024;
+            else if (suffix == 'M')
+                size *= 1024 * 1024;
         } else {
-             if (static_cast<char>(std::toupper(static_cast<unsigned char>(s.back()))) == 'K') size *= 1024; 
-             else if (std::isdigit(static_cast<unsigned char>(s.back()))) size *= 1024;
+            if (static_cast<char>(std::toupper(static_cast<unsigned char>(s.back()))) == 'K')
+                size *= 1024;
+            else if (std::isdigit(static_cast<unsigned char>(s.back())))
+                size *= 1024;
         }
 
-        if (size >= 1024 * 1024) return std::format("{:.0f} MB", static_cast<double>(size) / (1024.0 * 1024.0));
-        if (size >= 1024) return std::format("{:.0f} KB", static_cast<double>(size) / 1024.0);
+        if (size >= 1024 * 1024)
+            return std::format("{:.0f} MB", static_cast<double>(size) / (1024.0 * 1024.0));
+        if (size >= 1024)
+            return std::format("{:.0f} KB", static_cast<double>(size) / 1024.0);
         return std::format("{} B", size);
     };
 
     constexpr std::array<std::string_view, 4> caches = {"3", "2", "1", "0"};
-    for(const auto& idx : caches) {
+    for (const auto& idx : caches) {
         std::string path = std::format("/sys/devices/system/cpu/cpu0/cache/index{}/size", idx);
         std::ifstream f(path);
         std::string size;
-        if (f >> size) return parse_cache(size);
+        if (f >> size)
+            return parse_cache(size);
     }
     return "Unknown";
 }
@@ -184,61 +207,76 @@ bool SystemInfo::has_vmx() {
 }
 
 std::string SystemInfo::get_virtualization() {
-    if (fs::exists("/.dockerenv") || fs::exists("/run/.containerenv")) return "Docker";
-    
+    if (fs::exists("/.dockerenv") || fs::exists("/run/.containerenv"))
+        return "Docker";
+
     if (fs::exists("/proc/1/environ")) {
         std::ifstream f("/proc/1/environ");
         std::string env;
         while (std::getline(f, env, '\0')) {
-            if (env.find("container=lxc") != std::string::npos) return "LXC";
+            if (env.find("container=lxc") != std::string::npos)
+                return "LXC";
         }
     }
-    
-    if (fs::exists("/proc/user_beancounters")) return "OpenVZ";
+
+    if (fs::exists("/proc/user_beancounters"))
+        return "OpenVZ";
 
     struct utsname buffer;
     if (uname(&buffer) == 0) {
         std::string release = buffer.release;
-        if (release.find("Microsoft") != std::string::npos || release.find("WSL") != std::string::npos)
+        if (release.find("Microsoft") != std::string::npos ||
+            release.find("WSL") != std::string::npos)
             return "WSL";
     }
 
     bool hv_bit = false;
-    #if defined(__x86_64__) || defined(__i386__)
+#if defined(__x86_64__) || defined(__i386__)
     unsigned int eax, ebx, ecx, edx;
-    __cpuid(1, eax, ebx, ecx, edx); 
-    if (ecx & (1U << 31)) hv_bit = true;
-    #endif
+    __cpuid(1, eax, ebx, ecx, edx);
+    if (ecx & (1U << 31))
+        hv_bit = true;
+#endif
 
     if (hv_bit) {
-        #if defined(__x86_64__) || defined(__i386__)
+#if defined(__x86_64__) || defined(__i386__)
         unsigned int leaf = 0x40000000;
         __cpuid(leaf, eax, ebx, ecx, edx);
-        
+
         std::array<char, 13> vendor{};
         std::memcpy(vendor.data(), &ebx, 4);
         std::memcpy(vendor.data() + 4, &ecx, 4);
         std::memcpy(vendor.data() + 8, &edx, 4);
         vendor[12] = '\0';
-        
+
         std::string sig(vendor.data());
-        
-        if (sig == "KVMKVMKVM") return "KVM";
-        if (sig == "Microsoft Hv") return "Hyper-V";
-        if (sig == "VMwareVMware") return "VMware";
-        if (sig == "XenVMMXenVMM") return "Xen";
-        if (sig == "VBoxVBoxVBox") return "VirtualBox";
-        if (sig == "prl hyperv  ") return "Parallels";
-        if (sig == "TCGTCGTCGTCG") return "QEMU";
-        #endif
+
+        if (sig == "KVMKVMKVM")
+            return "KVM";
+        if (sig == "Microsoft Hv")
+            return "Hyper-V";
+        if (sig == "VMwareVMware")
+            return "VMware";
+        if (sig == "XenVMMXenVMM")
+            return "Xen";
+        if (sig == "VBoxVBoxVBox")
+            return "VirtualBox";
+        if (sig == "prl hyperv  ")
+            return "Parallels";
+        if (sig == "TCGTCGTCGTCG")
+            return "QEMU";
+#endif
     }
 
     std::ifstream dmi("/sys/class/dmi/id/product_name");
     std::string product;
     if (std::getline(dmi, product)) {
-        if (product.find("KVM") != std::string::npos) return "KVM";
-        if (product.find("QEMU") != std::string::npos) return "QEMU";
-        if (product.find("VirtualBox") != std::string::npos) return "VirtualBox";
+        if (product.find("KVM") != std::string::npos)
+            return "KVM";
+        if (product.find("QEMU") != std::string::npos)
+            return "QEMU";
+        if (product.find("VirtualBox") != std::string::npos)
+            return "VirtualBox";
     }
 
     return hv_bit ? "Dedicated (Virtual)" : "Dedicated";
@@ -247,10 +285,11 @@ std::string SystemInfo::get_virtualization() {
 std::string SystemInfo::get_os() {
     std::ifstream f("/etc/os-release");
     std::string line;
-    while(std::getline(f, line)) {
+    while (std::getline(f, line)) {
         if (line.starts_with("PRETTY_NAME=")) {
             auto val = line.substr(12);
-            if (val.size() >= 2 && val.front() == '"') val = val.substr(1, val.size()-2);
+            if (val.size() >= 2 && val.front() == '"')
+                val = val.substr(1, val.size() - 2);
             return val;
         }
     }
@@ -269,14 +308,16 @@ std::string SystemInfo::get_arch() {
 
 std::string SystemInfo::get_kernel() {
     struct utsname buffer;
-    if (uname(&buffer) == 0) return buffer.release;
+    if (uname(&buffer) == 0)
+        return buffer.release;
     return "Unknown";
 }
 
 std::string SystemInfo::get_tcp_cc() {
     std::ifstream f("/proc/sys/net/ipv4/tcp_congestion_control");
     std::string s;
-    if(f >> s) return s;
+    if (f >> s)
+        return s;
     return "Unknown";
 }
 
@@ -302,19 +343,19 @@ std::string SystemInfo::get_load_avg() {
 
 std::vector<SwapEntry> SystemInfo::get_swaps() {
     std::vector<SwapEntry> swaps;
-    
+
     std::ifstream f("/proc/swaps");
     std::string line;
-    
+
     if (std::getline(f, line)) {
         while (std::getline(f, line)) {
             std::stringstream ss(line);
             std::string path, type, size_str, used_str;
-            
+
             if (ss >> path >> type >> size_str >> used_str) {
                 SwapEntry entry;
                 entry.path = path;
-                
+
                 if (path.find("zram") != std::string::npos) {
                     entry.type = "ZRAM";
                 } else {
@@ -322,9 +363,11 @@ std::vector<SwapEntry> SystemInfo::get_swaps() {
                 }
 
                 uint64_t val_size = 0, val_used = 0;
-                auto [p1, ec1] = std::from_chars(size_str.data(), size_str.data() + size_str.size(), val_size);
-                auto [p2, ec2] = std::from_chars(used_str.data(), used_str.data() + used_str.size(), val_used);
-                
+                auto [p1, ec1] =
+                    std::from_chars(size_str.data(), size_str.data() + size_str.size(), val_size);
+                auto [p2, ec2] =
+                    std::from_chars(used_str.data(), used_str.data() + used_str.size(), val_used);
+
                 if (ec1 == std::errc() && ec2 == std::errc()) {
                     entry.size = val_size * 1024;
                     entry.used = val_used * 1024;
@@ -352,7 +395,7 @@ std::vector<SwapEntry> SystemInfo::get_swaps() {
 MemInfo SystemInfo::get_memory_status() {
     MemInfo info{};
     struct sysinfo si;
-    
+
     if (sysinfo(&si) == 0) {
         info.total = si.totalram * si.mem_unit;
     }
@@ -361,14 +404,14 @@ MemInfo SystemInfo::get_memory_status() {
     std::string line;
     uint64_t mem_available = 0;
 
-    while(std::getline(meminfo, line)) {
-        if(line.starts_with("MemAvailable:")) {
+    while (std::getline(meminfo, line)) {
+        if (line.starts_with("MemAvailable:")) {
             std::string_view sv = line;
             auto colon = sv.find(':');
             if (colon != std::string_view::npos) {
                 sv = sv.substr(colon + 1);
                 sv = trim_sv(sv);
-                
+
                 auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), mem_available);
                 if (ec == std::errc()) {
                     mem_available *= 1024;
@@ -398,12 +441,12 @@ MemInfo SystemInfo::get_memory_status() {
 DiskInfo SystemInfo::get_disk_usage(const std::string& mountpoint) {
     DiskInfo info{};
     struct statvfs disk;
-    
+
     if (statvfs(mountpoint.c_str(), &disk) == 0) {
         info.total = disk.f_blocks * disk.f_frsize;
         info.free = disk.f_bfree * disk.f_frsize;
         info.used = (disk.f_blocks - disk.f_bfree) * disk.f_frsize;
     }
-    
+
     return info;
 }

@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #include "include/interrupts.hpp"
 
 #include <csignal>
@@ -19,7 +26,7 @@ SignalGuard::SignalGuard() {
     struct sigaction sa = {};
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
-    
+
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
 }

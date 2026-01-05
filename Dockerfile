@@ -27,6 +27,7 @@ WORKDIR /src
 
 # Copy source files
 COPY CMakeLists.txt ./
+COPY LICENSE ./
 COPY cmake/ ./cmake/
 COPY include/ ./include/
 COPY src/ ./src/

@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #pragma once
 
 #include <cstdint>
@@ -9,7 +16,8 @@ void print_line();
 
 [[nodiscard]] constexpr std::string_view trim_sv(std::string_view str) noexcept {
     auto first = str.find_first_not_of(" \t\n\r");
-    if (first == std::string_view::npos) return {};
+    if (first == std::string_view::npos)
+        return {};
     auto last = str.find_last_not_of(" \t\n\r");
     return str.substr(first, last - first + 1);
 }

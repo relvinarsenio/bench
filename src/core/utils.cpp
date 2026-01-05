@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #include "include/utils.hpp"
 
 #include <array>
@@ -17,7 +24,7 @@
 namespace fs = std::filesystem;
 
 void print_line() {
-    int target_width = 80; 
+    int target_width = 80;
     int width = target_width;
 
     struct winsize w;
@@ -30,10 +37,11 @@ void print_line() {
 }
 
 std::string format_bytes(std::uint64_t bytes) {
-    if (bytes == 0) return "0";
-    
+    if (bytes == 0)
+        return "0";
+
     static constexpr std::array units = {"B", "KB", "MB", "GB", "TB"};
-    
+
     int i = 0;
     double d = static_cast<double>(bytes);
     while (d >= 1024 && i < 4) {
@@ -44,11 +52,8 @@ std::string format_bytes(std::uint64_t bytes) {
 }
 
 void cleanup_artifacts() {
-    const std::vector<std::string> paths = {
-        std::string(Config::SPEEDTEST_TGZ),
-        "speedtest-cli",
-        std::string(Config::BENCH_FILENAME)
-    };
+    const std::vector<std::string> paths = {std::string(Config::SPEEDTEST_TGZ), "speedtest-cli",
+                                            std::string(Config::BENCH_FILENAME)};
     const auto exe_dir = get_exe_dir();
     for (const auto& p : paths) {
         std::error_code ec;
@@ -65,6 +70,7 @@ void cleanup_artifacts() {
 std::filesystem::path get_exe_dir() {
     std::error_code ec;
     auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
-    if (!ec && exe.has_parent_path()) return exe.parent_path();
+    if (!ec && exe.has_parent_path())
+        return exe.parent_path();
     return std::filesystem::current_path();
 }

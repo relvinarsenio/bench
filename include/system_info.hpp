@@ -1,8 +1,15 @@
+/*
+ * Copyright (c) 2025 Alfie Ardinata
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */                                                                                                \
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 struct SwapEntry {
     std::string type; // Partition, File, ZRAM, ZSwap
@@ -26,6 +33,7 @@ struct DiskInfo {
 
 class SystemInfo {
     static const std::string& get_cpuinfo_cache();
+
 public:
     static std::string get_model_name();
     static std::string get_cpu_cores_freq();
@@ -39,7 +47,7 @@ public:
     static std::string get_tcp_cc();
     static std::string get_uptime();
     static std::string get_load_avg();
-    
+
     static std::vector<SwapEntry> get_swaps();
 
     static MemInfo get_memory_status();
