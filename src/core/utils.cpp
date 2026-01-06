@@ -22,16 +22,37 @@
 
 namespace fs = std::filesystem;
 
-void print_line() {
-    int target_width = 80;
-    int width = target_width;
-
+std::size_t get_term_width() {
     struct winsize w;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0) {
-        width = std::min(static_cast<int>(w.ws_col), target_width);
+        return std::min(static_cast<std::size_t>(w.ws_col), Config::TERM_WIDTH);
+    }
+    return Config::TERM_WIDTH;
+}
+
+void print_line() {
+    std::size_t width = get_term_width();
+    std::println("{:-<{}}", "", width);
+}
+
+void print_centered_header(std::string_view text) {
+    std::size_t width = get_term_width();
+    std::size_t text_len = text.length();
+
+    if (text_len >= width - 2) {
+        std::println("{}", text);
+        return;
     }
 
-    std::print("{:-<{}}\n", "", width);
+    std::size_t remaining = width - text_len - 2;
+    std::size_t left_pad = remaining / 2;
+    std::size_t right_pad = remaining - left_pad;
+
+    std::println("{} {} {}", 
+        std::string(left_pad, '-'), 
+        text, 
+        std::string(right_pad, '-')
+    );
 }
 
 std::string format_bytes(std::uint64_t bytes) {

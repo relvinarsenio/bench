@@ -21,6 +21,7 @@ constexpr int IO_READ_QUEUE_DEPTH = 16;
 constexpr std::size_t IO_WRITE_BLOCK_SIZE = 1 * 1024 * 1024;
 constexpr std::size_t IO_READ_BLOCK_SIZE = 1 * 1024 * 1024;
 constexpr std::size_t IO_ALIGNMENT = 4096;
+constexpr std::size_t TERM_WIDTH = 80;
 constexpr std::string_view BENCH_FILENAME = "benchtest_file";
 
 constexpr bool IO_URING_ENABLED = true;

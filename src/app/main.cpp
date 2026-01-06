@@ -135,9 +135,10 @@ void run_app(std::string_view app_path) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     std::print("\033c");
-    print_line();
-    std::println(" A Bench Script (C++ Edition v7.1.2)");
-    std::println(" Usage : ./{}", app_name);
+    print_centered_header("Calyx - Rapid VPS Profiler (v7.1.2)");
+    std::println(" Author : Alfie Ardinata (https://calyx.pages.dev/)");
+    std::println(" GitHub : https://github.com/relviarsenio/calyx");
+    std::println(" Usage  : ./{}", app_name);
     print_line();
 
     std::println(" -> {}", Color::colorize("CPU & Hardware", Color::BOLD));
