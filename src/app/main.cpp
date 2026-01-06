@@ -15,6 +15,9 @@
 #include <string_view>
 #include <vector>
 
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <openssl/crypto.h>
@@ -51,6 +54,35 @@ public:
     LibCurlContext(const LibCurlContext&) = delete;
     LibCurlContext& operator=(const LibCurlContext&) = delete;
 };
+
+std::string get_device_name(const std::string& path) {
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0)
+        return "unknown device";
+
+    std::ifstream mountinfo("/proc/self/mountinfo");
+    std::string line;
+    std::string target_dev = std::format("{}:{}", major(st.st_dev), minor(st.st_dev));
+
+    while (std::getline(mountinfo, line)) {
+        std::stringstream ss(line);
+        std::string id, parent, major_minor, root, mount_point;
+
+        if (ss >> id >> parent >> major_minor >> root >> mount_point) {
+            if (major_minor == target_dev) {
+                std::string token;
+                while (ss >> token && token != "-")
+                    ;
+
+                std::string fs_type, source;
+                if (ss >> fs_type >> source) {
+                    return source;
+                }
+            }
+        }
+    }
+    return "virtual device";
+}
 
 struct ProgressStyle {
     std::string_view fill;
@@ -106,6 +138,12 @@ void run_app(std::string_view app_path) {
     std::println(" {:<20} : {}", "Load Average",
                  Color::colorize(SystemInfo::get_load_avg(), Color::YELLOW));
 
+    std::error_code ec;
+    std::string current_dir = fs::current_path(ec).string();
+    if (ec)
+        current_dir = ".";
+    std::string dev_name = get_device_name(current_dir);
+
     auto mem = SystemInfo::get_memory_status();
     auto disk = SystemInfo::get_disk_usage("/");
 
@@ -113,6 +151,10 @@ void run_app(std::string_view app_path) {
     std::println(" {:<20} : {} ({} Used)", "Total Disk",
                  Color::colorize(format_bytes(disk.total), Color::YELLOW),
                  Color::colorize(format_bytes(disk.used), Color::CYAN));
+
+    std::println(" {:<20} : {} ({})", "Disk Test Path", Color::colorize(current_dir, Color::CYAN),
+                 Color::colorize(dev_name, Color::YELLOW));
+
     std::println(" {:<20} : {} ({} Used)", "Total Mem",
                  Color::colorize(format_bytes(mem.total), Color::YELLOW),
                  Color::colorize(format_bytes(mem.used), Color::CYAN));
