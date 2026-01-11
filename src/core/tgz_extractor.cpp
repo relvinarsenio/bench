@@ -87,23 +87,19 @@ bool validate_checksum(std::span<const std::byte> header) {
 }
 
 std::expected<void, ExtractError> create_secure_directory(const std::filesystem::path& dir_path) {
-    std::error_code ec;
-
-    if (!std::filesystem::create_directories(dir_path, ec)) {
-        if (ec && ec.value() != EEXIST) {
-            return std::unexpected(ExtractError::CreateDirFailed);
+    if (auto parent = dir_path.parent_path(); !parent.empty() && parent != dir_path) {
+        std::error_code ec;
+        if (!std::filesystem::exists(parent, ec)) {
+            if (auto result = create_secure_directory(parent); !result) {
+                return result;
+            }
         }
     }
 
-    std::filesystem::permissions(dir_path,
-                                 std::filesystem::perms::owner_all |
-                                     std::filesystem::perms::group_read |
-                                     std::filesystem::perms::group_exec,
-                                 std::filesystem::perm_options::replace,
-                                 ec);
-
-    if (ec) {
-        return std::unexpected(ExtractError::CreateDirFailed);
+    if (::mkdir(dir_path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP) != 0) {
+        if (errno != EEXIST) {
+            return std::unexpected(ExtractError::CreateDirFailed);
+        }
     }
 
     return {};
