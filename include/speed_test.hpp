@@ -29,7 +29,7 @@ class SpeedTest {
 
     std::string get_arch();
 
-public:
+   public:
     explicit SpeedTest(HttpClient& h);
 
     ~SpeedTest();

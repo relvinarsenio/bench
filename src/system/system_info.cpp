@@ -64,7 +64,7 @@ bool cpu_has_flag(std::string_view flag) {
     return false;
 }
 
-} // namespace
+}  // namespace
 
 std::string SystemInfo::get_model_name() {
 #if defined(__i386__) || defined(__x86_64__)
@@ -116,7 +116,7 @@ std::string SystemInfo::get_model_name() {
         }
     }
 
-    struct utsname buf{};
+    struct utsname buf {};
     if (::uname(&buf) == 0)
         return std::string(buf.machine);
     return "Unknown CPU";

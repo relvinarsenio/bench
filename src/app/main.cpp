@@ -38,7 +38,7 @@ using namespace std::chrono;
 using json = nlohmann::json;
 
 class LibCurlContext {
-public:
+   public:
     LibCurlContext() {
         if (OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, nullptr) == 0) {
             throw std::runtime_error("Failed to initialize OpenSSL crypto library");
@@ -49,14 +49,16 @@ public:
         }
     }
 
-    ~LibCurlContext() { curl_global_cleanup(); }
+    ~LibCurlContext() {
+        curl_global_cleanup();
+    }
 
     LibCurlContext(const LibCurlContext&) = delete;
     LibCurlContext& operator=(const LibCurlContext&) = delete;
 };
 
 std::string get_device_name(const std::string& path) {
-    struct stat st{};
+    struct stat st {};
     if (stat(path.c_str(), &st) != 0)
         return "unknown device";
 
@@ -135,39 +137,43 @@ void run_app(std::string_view app_path) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     std::print("\033c");
-    print_centered_header("Calyx - Rapid VPS Profiler (v7.1.2)");
+    print_centered_header("Calyx - Rapid VPS Profiler (v7.2.0)");
     std::println(" {:<18} : {}", "Author", "Alfie Ardinata (https://calyx.pages.dev/)");
     std::println(" {:<18} : {}", "GitHub", "https://github.com/relvinarsenio/calyx");
     std::println(" {:<18} : ./{}", "Usage", app_name);
     print_line();
 
     std::println(" -> {}", Color::colorize("CPU & Hardware", Color::BOLD));
-    std::println(" {:<20} : {}", "CPU Model",
-                 Color::colorize(SystemInfo::get_model_name(), Color::CYAN));
-    std::println(" {:<20} : {}", "CPU Cores",
+    std::println(
+        " {:<20} : {}", "CPU Model", Color::colorize(SystemInfo::get_model_name(), Color::CYAN));
+    std::println(" {:<20} : {}",
+                 "CPU Cores",
                  Color::colorize(SystemInfo::get_cpu_cores_freq(), Color::CYAN));
-    std::println(" {:<20} : {}", "CPU Cache",
-                 Color::colorize(SystemInfo::get_cpu_cache(), Color::CYAN));
-    std::println(" {:<20} : {}", "AES-NI",
+    std::println(
+        " {:<20} : {}", "CPU Cache", Color::colorize(SystemInfo::get_cpu_cache(), Color::CYAN));
+    std::println(" {:<20} : {}",
+                 "AES-NI",
                  SystemInfo::has_aes() ? Color::colorize("\u2713 Enabled", Color::GREEN)
                                        : Color::colorize("\u2717 Disabled", Color::RED));
-    std::println(" {:<20} : {}", "VM-x/AMD-V",
+    std::println(" {:<20} : {}",
+                 "VM-x/AMD-V",
                  SystemInfo::has_vmx() ? Color::colorize("\u2713 Enabled", Color::GREEN)
                                        : Color::colorize("\u2717 Disabled", Color::RED));
 
     std::println("\n -> {}", Color::colorize("System Info", Color::BOLD));
     std::println(" {:<20} : {}", "OS", Color::colorize(SystemInfo::get_os(), Color::CYAN));
     std::println(" {:<20} : {}", "Arch", Color::colorize(SystemInfo::get_arch(), Color::YELLOW));
-    std::println(" {:<20} : {}", "Kernel",
-                 Color::colorize(SystemInfo::get_kernel(), Color::YELLOW));
-    std::println(" {:<20} : {}", "TCP CC",
-                 Color::colorize(SystemInfo::get_tcp_cc(), Color::YELLOW));
-    std::println(" {:<20} : {}", "Virtualization",
+    std::println(
+        " {:<20} : {}", "Kernel", Color::colorize(SystemInfo::get_kernel(), Color::YELLOW));
+    std::println(
+        " {:<20} : {}", "TCP CC", Color::colorize(SystemInfo::get_tcp_cc(), Color::YELLOW));
+    std::println(" {:<20} : {}",
+                 "Virtualization",
                  Color::colorize(SystemInfo::get_virtualization(), Color::CYAN));
-    std::println(" {:<20} : {}", "System Uptime",
-                 Color::colorize(SystemInfo::get_uptime(), Color::CYAN));
-    std::println(" {:<20} : {}", "Load Average",
-                 Color::colorize(SystemInfo::get_load_avg(), Color::YELLOW));
+    std::println(
+        " {:<20} : {}", "System Uptime", Color::colorize(SystemInfo::get_uptime(), Color::CYAN));
+    std::println(
+        " {:<20} : {}", "Load Average", Color::colorize(SystemInfo::get_load_avg(), Color::YELLOW));
 
     std::error_code ec;
     std::string current_dir = fs::current_path(ec).string();
@@ -179,12 +185,16 @@ void run_app(std::string_view app_path) {
     auto disk = SystemInfo::get_disk_usage(current_dir);
 
     std::println("\n -> {}", Color::colorize("Storage & Memory", Color::BOLD));
-    std::println(" {:<20} : {} ({})", "Disk Test Path", Color::colorize(current_dir, Color::CYAN),
+    std::println(" {:<20} : {} ({})",
+                 "Disk Test Path",
+                 Color::colorize(current_dir, Color::CYAN),
                  Color::colorize(dev_name, Color::YELLOW));
-    std::println(" {:<20} : {} ({} Used)", "Total Disk",
+    std::println(" {:<20} : {} ({} Used)",
+                 "Total Disk",
                  Color::colorize(format_bytes(disk.total), Color::YELLOW),
                  Color::colorize(format_bytes(disk.used), Color::CYAN));
-    std::println(" {:<20} : {} ({} Used)", "Total Mem",
+    std::println(" {:<20} : {} ({} Used)",
+                 "Total Mem",
                  Color::colorize(format_bytes(mem.total), Color::YELLOW),
                  Color::colorize(format_bytes(mem.used), Color::CYAN));
 
@@ -197,7 +207,8 @@ void run_app(std::string_view app_path) {
             used_swap += s.used;
         }
 
-        std::println(" {:<20} : {} ({} Used)", "Total Swap",
+        std::println(" {:<20} : {} ({} Used)",
+                     "Total Swap",
                      Color::colorize(format_bytes(total_swap), Color::YELLOW),
                      Color::colorize(format_bytes(used_swap), Color::CYAN));
 
@@ -217,7 +228,8 @@ void run_app(std::string_view app_path) {
     std::println("\n -> {}", Color::colorize("Network", Color::BOLD));
     bool v4 = http.check_connectivity("ipv4.google.com");
     bool v6 = http.check_connectivity("ipv6.google.com");
-    std::print(" {:<20} : {} / {}\n", "IPv4/IPv6",
+    std::print(" {:<20} : {} / {}\n",
+               "IPv4/IPv6",
                v4 ? Color::colorize("\u2713 Online", Color::GREEN)
                   : Color::colorize("\u2717 Offline", Color::RED),
                v6 ? Color::colorize("\u2713 Online", Color::GREEN)
@@ -244,7 +256,9 @@ void run_app(std::string_view app_path) {
                 std::println(" {:<20} : {}", "ISP", Color::colorize(display_isp, Color::CYAN));
             }
 
-            std::println(" {:<20} : {} / {}", "Location", Color::colorize(city, Color::CYAN),
+            std::println(" {:<20} : {} / {}",
+                         "Location",
+                         Color::colorize(city, Color::CYAN),
                          Color::colorize(country, Color::CYAN));
 
             if (!region.empty()) {
@@ -255,8 +269,8 @@ void run_app(std::string_view app_path) {
             std::println(" {:<20} : {}", "IP Info", Color::colorize("Parse Error", Color::RED));
         }
     } else {
-        std::println(" {:<20} : {}", "IP Info",
-                     Color::colorize("Failed: " + ip_res.error(), Color::RED));
+        std::println(
+            " {:<20} : {}", "IP Info", Color::colorize("Failed: " + ip_res.error(), Color::RED));
     }
 
     print_line();
@@ -288,14 +302,16 @@ void run_app(std::string_view app_path) {
 
         if (result) {
             std::println(
-                " {:<{}}: {}   {}", result->label, io_label_width,
+                " {:<{}}: {}   {}",
+                result->label,
+                io_label_width,
                 Color::colorize(std::format("Write {:>8.1f} MB/s", result->write_mbps),
                                 Color::YELLOW),
                 Color::colorize(std::format("Read {:>8.1f} MB/s", result->read_mbps), Color::CYAN));
             disk_runs.push_back(*result);
         } else {
-            std::println("\r{}[!] Disk Test Aborted: {}{}", Color::RED, result.error(),
-                         Color::RESET);
+            std::println(
+                "\r{}[!] Disk Test Aborted: {}{}", Color::RED, result.error(), Color::RESET);
             disk_error = true;
             break;
         }
@@ -311,7 +327,9 @@ void run_app(std::string_view app_path) {
         double avg_w = disk_runs.empty() ? 0.0 : total_w / static_cast<double>(disk_runs.size());
         double avg_r = disk_runs.empty() ? 0.0 : total_r / static_cast<double>(disk_runs.size());
 
-        std::println(" {:<{}}: {}   {}", " I/O Speed (Average)", io_label_width,
+        std::println(" {:<{}}: {}   {}",
+                     " I/O Speed (Average)",
+                     io_label_width,
                      Color::colorize(std::format("Write {:>8.1f} MB/s", avg_w), Color::YELLOW),
                      Color::colorize(std::format("Read {:>8.1f} MB/s", avg_r), Color::CYAN));
 

@@ -29,6 +29,7 @@
 #include "include/results.hpp"
 #include "include/shell_pipe.hpp"
 #include "include/utils.hpp"
+#include "include/tgz_extractor.hpp"
 
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -53,7 +54,7 @@ class SpinnerScope {
     std::string_view label_;
     bool active_ = false;
 
-public:
+   public:
     SpinnerScope(const SpinnerCallback& cb, std::string_view label) : cb_(cb), label_(label) {
         active_ = static_cast<bool>(cb_);
         if (active_)
@@ -87,10 +88,10 @@ std::string sanitize_error(std::string_view msg) {
     return std::string(msg);
 }
 
-} // namespace
+}  // namespace
 
 SpeedTest::SpeedTest(HttpClient& h) : http_(h) {
-    std::string temp_template = (fs::temp_directory_path() / "bench_XXXXXX").string();
+    std::string temp_template = (fs::temp_directory_path() / "calyx_XXXXXX").string();
 
     char* path_ptr = mkdtemp(temp_template.data());
 
@@ -133,25 +134,32 @@ void SpeedTest::install() {
     std::string url = std::format(
         "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{}.tgz", get_arch());
 
-    auto result = http_.download(url, tgz_path_.string());
-    if (!result) {
-        throw std::runtime_error(result.error());
+    auto dl_res = http_.download(url, tgz_path_.string());
+    if (!dl_res) {
+        throw std::runtime_error("Gagal download: " + dl_res.error());
     }
 
-    fs::create_directories(cli_dir_);
+    std::error_code ec;
+    fs::create_directories(cli_dir_, ec);
+    if (ec) {
+        throw std::runtime_error("Gagal bikin folder instalasi: " + ec.message());
+    }
 
-    std::vector<std::string> tar_args = {"tar", "zxf", tgz_path_.string(), "-C", cli_dir_.string()};
+    auto result = calyx::core::TgzExtractor::extract(tgz_path_, cli_dir_);
 
-    ShellPipe pipe(tar_args);
-    pipe.read_all(std::chrono::milliseconds(60000));
+    if (!result) {
+        std::string msg = calyx::core::TgzExtractor::error_string(result.error());
+        throw std::runtime_error("Gagal ekstrak Speedtest: " + msg);
+    }
 
-    if (!fs::exists(cli_path_))
-        throw std::runtime_error("Failed to extract speedtest-cli");
+    if (!fs::exists(cli_path_)) {
+        throw std::runtime_error("Binary speedtest tidak ditemukan setelah ekstraksi!");
+    }
+
     fs::permissions(cli_path_, fs::perms::owner_all, fs::perm_options::add);
 }
 
 SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
-
     SpeedTestResult result;
 
     result.entries.reserve(SERVERS.size());
@@ -162,8 +170,8 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
         SpinnerScope spinner(spinner_cb, node.name);
 
-        std::vector<std::string> cmd_args = {cli_path_.string(), "-f", "json", "--accept-license",
-                                             "--accept-gdpr"};
+        std::vector<std::string> cmd_args = {
+            cli_path_.string(), "-f", "json", "--accept-license", "--accept-gdpr"};
 
         if (!node.id.empty()) {
             cmd_args.push_back(std::format("--server-id={}", node.id));
@@ -267,7 +275,6 @@ SpeedTestResult SpeedTest::run(const SpinnerCallback& spinner_cb) {
 
             if (!found_result && !entry.success && entry.error.empty()) {
                 if (result.rate_limited) {
-
                 } else if (!last_raw_output.empty()) {
                     std::string clean_msg = trim(last_raw_output);
                     if (clean_msg.length() > 50)

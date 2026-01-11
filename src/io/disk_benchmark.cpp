@@ -72,29 +72,29 @@ std::unique_ptr<std::byte[], AlignedDelete> make_aligned_buffer(std::size_t size
 
 std::string get_error_message(int err, std::string_view operation) {
     switch (err) {
-    case ENOSPC:
-        return "Storage capacity limit reached (Disk Full)";
-    case EDQUOT:
-        return "User disk quota exceeded";
-    case EIO:
-        return "Critical I/O error (Hardware failure suspected)";
-    case EROFS:
-        return "File system is Read-Only";
-    case EACCES:
-    case EPERM:
-        if (operation == "create")
-            return "Permission denied. Cannot create file in this directory.";
-        else
-            return "Permission denied during write operation.";
-    case EINVAL:
-        if (operation == "create")
-            return "FATAL: Filesystem does NOT support O_DIRECT (Direct I/O). Test aborted to "
-                   "maintain integrity.";
-        else
-            return "Invalid argument provided";
-    default:
-        return std::format("Operation '{}' failed: {}", operation,
-                           std::system_category().message(err));
+        case ENOSPC:
+            return "Storage capacity limit reached (Disk Full)";
+        case EDQUOT:
+            return "User disk quota exceeded";
+        case EIO:
+            return "Critical I/O error (Hardware failure suspected)";
+        case EROFS:
+            return "File system is Read-Only";
+        case EACCES:
+        case EPERM:
+            if (operation == "create")
+                return "Permission denied. Cannot create file in this directory.";
+            else
+                return "Permission denied during write operation.";
+        case EINVAL:
+            if (operation == "create")
+                return "FATAL: Filesystem does NOT support O_DIRECT (Direct I/O). Test aborted to "
+                       "maintain integrity.";
+            else
+                return "Invalid argument provided";
+        default:
+            return std::format(
+                "Operation '{}' failed: {}", operation, std::system_category().message(err));
     }
 }
 
@@ -105,14 +105,20 @@ std::string uring_error(int rc, std::string_view op) {
     return std::format("io_uring {} failed: {}", op, std::system_category().message(err));
 }
 
-std::expected<void, std::string>
-run_uring_io(bool is_write, io_uring& ring, int fd, std::uint64_t total_blocks,
-             std::uint64_t total_bytes, std::size_t block_size, std::byte* write_buffer,
-             const std::vector<std::unique_ptr<std::byte[], AlignedDelete>>& read_buffers,
-             int queue_depth, high_resolution_clock::time_point deadline,
-             const std::function<void(std::size_t, std::size_t, std::string_view)>& progress_cb,
-             std::string_view label, std::stop_token stop) {
-
+std::expected<void, std::string> run_uring_io(
+    bool is_write,
+    io_uring& ring,
+    int fd,
+    std::uint64_t total_blocks,
+    std::uint64_t total_bytes,
+    std::size_t block_size,
+    std::byte* write_buffer,
+    const std::vector<std::unique_ptr<std::byte[], AlignedDelete>>& read_buffers,
+    int queue_depth,
+    high_resolution_clock::time_point deadline,
+    const std::function<void(std::size_t, std::size_t, std::string_view)>& progress_cb,
+    std::string_view label,
+    std::stop_token stop) {
     std::uint64_t submitted = 0;
     std::uint64_t completed = 0;
 
@@ -183,14 +189,17 @@ run_uring_io(bool is_write, io_uring& ring, int fd, std::uint64_t total_blocks,
                 io_uring_cq_advance(&ring, count);
                 std::string op = is_write ? "write" : "read";
                 return std::unexpected(
-                    std::format("Disk Test failed: Partial {} (expected {} bytes, got {})", op,
-                                expected_len, cqe->res));
+                    std::format("Disk Test failed: Partial {} (expected {} bytes, got {})",
+                                op,
+                                expected_len,
+                                cqe->res));
             }
 
             ++completed;
             if (progress_cb && completed % 2 == 0) {
                 progress_cb(static_cast<std::size_t>(completed),
-                            static_cast<std::size_t>(total_blocks), label);
+                            static_cast<std::size_t>(total_blocks),
+                            label);
             }
         }
 
@@ -206,13 +215,13 @@ run_uring_io(bool is_write, io_uring& ring, int fd, std::uint64_t total_blocks,
 
 #endif
 
-} // namespace
+}  // namespace
 
 std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
-    int size_mb, std::string_view label,
+    int size_mb,
+    std::string_view label,
     const std::function<void(std::size_t, std::size_t, std::string_view)>& progress_cb,
     std::stop_token stop) {
-
     const std::string filename(Config::TEST_FILENAME);
     FileCleaner cleaner{filename};
 
@@ -221,7 +230,7 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
     const int queue_depth_write = std::max(1, Config::IO_WRITE_QUEUE_DEPTH);
     const int queue_depth_read = std::max(1, Config::IO_READ_QUEUE_DEPTH);
 
-    struct statvfs vfs{};
+    struct statvfs vfs {};
     if (::statvfs(".", &vfs) == 0) {
         std::uint64_t available = static_cast<std::uint64_t>(vfs.f_bavail) * vfs.f_frsize;
         std::uint64_t required = static_cast<std::uint64_t>(size_mb) * 1024 * 1024;
@@ -290,9 +299,19 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
                                                std::system_category().message(-ret)));
         }
 
-        auto res = run_uring_io(true, ring, fd.get(), total_write_blocks, total_bytes,
-                                write_block_size, buffer.get(), {}, queue_depth_write, deadline,
-                                progress_cb, write_label, stop);
+        auto res = run_uring_io(true,
+                                ring,
+                                fd.get(),
+                                total_write_blocks,
+                                total_bytes,
+                                write_block_size,
+                                buffer.get(),
+                                {},
+                                queue_depth_write,
+                                deadline,
+                                progress_cb,
+                                write_label,
+                                stop);
         io_uring_queue_exit(&ring);
         if (!res)
             return std::unexpected(res.error());
@@ -303,7 +322,8 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
 
         if (progress_cb)
             progress_cb(static_cast<std::size_t>(total_write_blocks),
-                        static_cast<std::size_t>(total_write_blocks), write_label);
+                        static_cast<std::size_t>(total_write_blocks),
+                        write_label);
 
         if (::fdatasync(fd.get()) == -1) {
             return std::unexpected("Disk sync failed: " + get_error_message(errno, "sync"));
@@ -341,16 +361,27 @@ std::expected<DiskIORunResult, std::string> DiskBenchmark::run_io_test(
                                            std::system_category().message(-ret)));
     }
 
-    auto res = run_uring_io(false, ring, read_fd.get(), total_read_blocks, total_bytes,
-                            read_block_size, nullptr, read_buffers, queue_depth_read, deadline,
-                            progress_cb, read_label, stop);
+    auto res = run_uring_io(false,
+                            ring,
+                            read_fd.get(),
+                            total_read_blocks,
+                            total_bytes,
+                            read_block_size,
+                            nullptr,
+                            read_buffers,
+                            queue_depth_read,
+                            deadline,
+                            progress_cb,
+                            read_label,
+                            stop);
     io_uring_queue_exit(&ring);
     if (!res)
         return std::unexpected(res.error());
 #endif
 
     if (progress_cb)
-        progress_cb(static_cast<size_t>(total_read_blocks), static_cast<size_t>(total_read_blocks),
+        progress_cb(static_cast<size_t>(total_read_blocks),
+                    static_cast<size_t>(total_read_blocks),
                     read_label);
 
     auto end_read = high_resolution_clock::now();

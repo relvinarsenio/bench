@@ -67,7 +67,6 @@ std::string format_bytes(std::uint64_t bytes) {
 }
 
 void cleanup_artifacts() {
-
     const auto exe_dir = get_exe_dir();
 
     for (const auto& filename :

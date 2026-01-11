@@ -13,4 +13,4 @@
 namespace CliRenderer {
 void render_speed_results(const SpeedTestResult& result);
 SpinnerCallback make_spinner_callback();
-} // namespace CliRenderer
+}  // namespace CliRenderer

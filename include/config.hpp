@@ -42,4 +42,26 @@ constexpr long CHECK_CONN_TIMEOUT_SEC = 5;
 constexpr long CHECK_CONN_CONNECT_TIMEOUT_SEC = 3;
 
 constexpr int UI_SPINNER_DELAY_MS = 150;
-} // namespace Config
+
+// TGZ Extractor Security Limits
+constexpr std::uint64_t TGZ_MAX_FILE_SIZE = 100 * 1024 * 1024;   // 100MB per file
+constexpr std::uint64_t TGZ_MAX_TOTAL_SIZE = 500 * 1024 * 1024;  // 500MB total
+constexpr std::uint32_t TGZ_MAX_FILES = 10000;                   // Max files in archive
+constexpr std::uint32_t TGZ_MAX_PATH_DEPTH = 20;                 // Max directory depth
+constexpr std::uint32_t TGZ_MAX_PATH_LENGTH = 255;               // Max single component length
+constexpr std::uint32_t TGZ_MAX_TOTAL_PATH_LENGTH = 4096;        // Max total path length
+
+// TAR Format Constants
+constexpr std::size_t TAR_BLOCK_SIZE = 512;
+constexpr std::size_t TAR_NAME_OFFSET = 0;
+constexpr std::size_t TAR_NAME_LENGTH = 100;
+constexpr std::size_t TAR_MODE_OFFSET = 100;
+constexpr std::size_t TAR_MODE_LENGTH = 8;
+constexpr std::size_t TAR_SIZE_OFFSET = 124;
+constexpr std::size_t TAR_SIZE_LENGTH = 12;
+constexpr std::size_t TAR_CHECKSUM_OFFSET = 148;
+constexpr std::size_t TAR_CHECKSUM_LENGTH = 8;
+constexpr std::size_t TAR_TYPE_OFFSET = 156;
+constexpr std::size_t TAR_PREFIX_OFFSET = 345;
+constexpr std::size_t TAR_PREFIX_LENGTH = 155;
+}  // namespace Config

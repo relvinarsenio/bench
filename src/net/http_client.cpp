@@ -31,7 +31,7 @@ struct CurlSlistDeleter {
 class CurlHeaders {
     std::unique_ptr<struct curl_slist, CurlSlistDeleter> list_;
 
-public:
+   public:
     void add(const std::string& header) {
         auto new_head = curl_slist_append(list_.get(), header.c_str());
         if (new_head && !list_) {
@@ -39,13 +39,16 @@ public:
         }
     }
 
-    struct curl_slist* get() const { return list_.get(); }
+    struct curl_slist* get() const {
+        return list_.get();
+    }
 };
 
 void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
-    headers.add("Accept: "
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/"
-                "apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+    headers.add(
+        "Accept: "
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/"
+        "apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
     headers.add("Accept-Language: en-US,en;q=0.9");
     headers.add("Cache-Control: max-age=0");
     headers.add("Connection: keep-alive");
@@ -63,13 +66,13 @@ void setup_browser_impersonation(CURL* handle, CurlHeaders& headers) {
     curl_easy_setopt(handle, CURLOPT_REFERER, "https://www.google.com/");
     curl_easy_setopt(handle, CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br");
 
-    struct curl_blob blob{};
+    struct curl_blob blob {};
     blob.data = const_cast<void*>(static_cast<const void*>(cacert_pem));
     blob.len = cacert_pem_len;
     curl_easy_setopt(handle, CURLOPT_CAINFO_BLOB, &blob);
 }
 
-} // namespace
+}  // namespace
 
 HttpClient::HttpClient() : handle_(curl_easy_init(), curl_easy_cleanup) {
     if (!handle_)
@@ -123,7 +126,8 @@ std::expected<std::string, std::string> HttpClient::get(const std::string& url) 
     curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(
-        handle_.get(), CURLOPT_XFERINFOFUNCTION,
+        handle_.get(),
+        CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
             return g_interrupted ? 1 : 0;
         });
@@ -144,8 +148,8 @@ std::expected<void, std::string> HttpClient::download(const std::string& url,
 
     std::ofstream outfile(filepath, std::ios::binary);
     if (!outfile) {
-        return std::unexpected(std::format("Cannot save file '{}': {}", filepath,
-                                           std::system_category().message(errno)));
+        return std::unexpected(std::format(
+            "Cannot save file '{}': {}", filepath, std::system_category().message(errno)));
     }
 
     CurlHeaders headers;
@@ -162,7 +166,8 @@ std::expected<void, std::string> HttpClient::download(const std::string& url,
     curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
 
     curl_easy_setopt(
-        handle_.get(), CURLOPT_XFERINFOFUNCTION,
+        handle_.get(),
+        CURLOPT_XFERINFOFUNCTION,
         +[](void*, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
             return g_interrupted ? 1 : 0;
         });
@@ -186,8 +191,8 @@ bool HttpClient::check_connectivity(const std::string& host) {
         curl_easy_setopt(handle_.get(), CURLOPT_URL, ("http://" + host).c_str());
         curl_easy_setopt(handle_.get(), CURLOPT_NOBODY, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_TIMEOUT, Config::CHECK_CONN_TIMEOUT_SEC);
-        curl_easy_setopt(handle_.get(), CURLOPT_CONNECTTIMEOUT,
-                         Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
+        curl_easy_setopt(
+            handle_.get(), CURLOPT_CONNECTTIMEOUT, Config::CHECK_CONN_CONNECT_TIMEOUT_SEC);
         curl_easy_setopt(handle_.get(), CURLOPT_USERAGENT, Config::HTTP_USER_AGENT.data());
         curl_easy_setopt(handle_.get(), CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(handle_.get(), CURLOPT_FORBID_REUSE, 1L);

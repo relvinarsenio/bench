@@ -6,7 +6,7 @@ cmake_policy(SET CMP0135 NEW)
 # =============================================================================
 # Calyx - Rapid Linux Server Profiler
 # =============================================================================
-project(calyx VERSION 7.1.2 LANGUAGES CXX C)
+project(calyx VERSION 7.2.0 LANGUAGES CXX C)
 
 # C++23 Required
 set(CMAKE_CXX_STANDARD 23)
@@ -200,6 +200,7 @@ add_executable(calyx
     src/app/main.cpp
     src/core/interrupts.cpp
     src/core/utils.cpp
+    src/core/tgz_extractor.cpp
     src/os/file_descriptor.cpp
     src/os/shell_pipe.cpp
     src/system/system_info.cpp
@@ -235,7 +236,6 @@ target_link_libraries(calyx
     OpenSSL::Crypto
     ZLIB::ZLIB
     Threads::Threads
-    m
 )
 
 if(USE_IO_URING)

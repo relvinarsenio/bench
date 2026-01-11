@@ -12,7 +12,7 @@
 class FileDescriptor {
     int fd_ = -1;
 
-public:
+   public:
     explicit FileDescriptor(int fd);
     ~FileDescriptor();
     FileDescriptor(const FileDescriptor&) = delete;

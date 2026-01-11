@@ -36,30 +36,30 @@ static int pidfd_open(pid_t pid, unsigned int flags) {
 
 static std::string describe_signal(int sig) {
     switch (sig) {
-    case SIGINT:
-        return "Interrupted by user (SIGINT)";
-    case SIGTERM:
-        return "Terminated (SIGTERM)";
-    case SIGKILL:
-        return "Killed (SIGKILL)";
-    case SIGQUIT:
-        return "Quit (SIGQUIT)";
-    case SIGPIPE:
-        return "Broken pipe (SIGPIPE)";
-    case SIGHUP:
-        return "Hangup (SIGHUP)";
-    case SIGABRT:
-        return "Aborted (SIGABRT)";
-    case SIGSEGV:
-        return "Segmentation fault (SIGSEGV)";
-    default: {
-        const char* msg = ::strsignal(sig);
-        if (msg) {
-            return std::string("Child terminated by signal ") + std::to_string(sig) + " (" + msg +
-                   ")";
+        case SIGINT:
+            return "Interrupted by user (SIGINT)";
+        case SIGTERM:
+            return "Terminated (SIGTERM)";
+        case SIGKILL:
+            return "Killed (SIGKILL)";
+        case SIGQUIT:
+            return "Quit (SIGQUIT)";
+        case SIGPIPE:
+            return "Broken pipe (SIGPIPE)";
+        case SIGHUP:
+            return "Hangup (SIGHUP)";
+        case SIGABRT:
+            return "Aborted (SIGABRT)";
+        case SIGSEGV:
+            return "Segmentation fault (SIGSEGV)";
+        default: {
+            const char* msg = ::strsignal(sig);
+            if (msg) {
+                return std::string("Child terminated by signal ") + std::to_string(sig) + " (" +
+                       msg + ")";
+            }
+            return std::string("Child terminated by signal ") + std::to_string(sig);
         }
-        return std::string("Child terminated by signal ") + std::to_string(sig);
-    }
     }
 }
 
@@ -160,7 +160,8 @@ ShellPipe::~ShellPipe() {
     }
 }
 
-std::string ShellPipe::read_all(std::chrono::milliseconds timeout, std::stop_token stop,
+std::string ShellPipe::read_all(std::chrono::milliseconds timeout,
+                                std::stop_token stop,
                                 bool raise_on_error) {
     std::string output;
     std::array<char, 4096> buffer;
@@ -195,7 +196,7 @@ std::string ShellPipe::read_all(std::chrono::milliseconds timeout, std::stop_tok
             throw std::runtime_error("Child process timed out while reading output");
         }
 
-        struct pollfd pfd{};
+        struct pollfd pfd {};
         pfd.fd = read_fd_;
         pfd.events = POLLIN;
 
@@ -257,8 +258,8 @@ std::string ShellPipe::read_all(std::chrono::milliseconds timeout, std::stop_tok
 
         int status = 0;
         if (::waitpid(pid_, &status, 0) == -1) {
-            throw std::system_error(errno, std::generic_category(),
-                                    "waitpid failed for child process");
+            throw std::system_error(
+                errno, std::generic_category(), "waitpid failed for child process");
         }
 
         if (WIFSIGNALED(status)) {
