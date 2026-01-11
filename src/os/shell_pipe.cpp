@@ -211,7 +211,6 @@ std::string ShellPipe::read_all(std::chrono::milliseconds timeout,
         }
 
         if (poll_res == 0) {
-            // timeout hit, loop will terminate on next iteration deadline check
             continue;
         }
 

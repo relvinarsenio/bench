@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <format>
+#include <functional>
 #include <memory>
 #include <print>
 #include <span>
@@ -164,5 +165,30 @@ SpinnerCallback make_spinner_callback() {
         }
     };
 }
+std::string create_progress_bar(int percent) {
+    const int filled = (percent * Config::PROGRESS_BAR_WIDTH) / 100;
 
+    std::string bar;
+    bar.reserve(Config::PROGRESS_BAR_WIDTH * 3);  // Unicode chars can be 3 bytes
+
+    for (int j = 0; j < Config::PROGRESS_BAR_WIDTH; ++j) {
+        bar += (j < filled) ? "\u2588" : "\u2591";
+    }
+
+    return bar;
+}
+
+std::function<void(std::size_t, std::size_t, std::string_view)> make_progress_callback(
+    int label_width) {
+    return [label_width](std::size_t current, std::size_t total, std::string_view lbl) {
+        const int percent = static_cast<int>((current * 100) / total);
+        const std::string bar = create_progress_bar(percent);
+        std::print("\r\x1b[2K {:<{}} [{}] {:3}%", lbl, label_width, bar, percent);
+    };
+}
+
+void render_progress_line(std::string_view label, int percent, int label_width) {
+    const std::string bar = create_progress_bar(percent);
+    std::print("\r\x1b[2K {:<{}} [{}] {:3}%", label, label_width, bar, percent);
+}
 }  // namespace CliRenderer

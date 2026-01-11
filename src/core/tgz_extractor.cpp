@@ -136,7 +136,8 @@ class SecureFileHandle {
     bool committed_ = false;
 
    public:
-    explicit SecureFileHandle(const std::filesystem::path& path) : fd_(create_fd(path)), file_path_(path) {}
+    explicit SecureFileHandle(const std::filesystem::path& path)
+        : fd_(create_fd(path)), file_path_(path) {}
 
     bool write(const void* data, size_t size) {
         ssize_t written = ::write(fd_.get(), data, size);

@@ -50,4 +50,5 @@ class SystemInfo {
 
     static MemInfo get_memory_status();
     static DiskInfo get_disk_usage(const std::string& mountpoint);
+    static std::string get_device_name(const std::string& path);
 };

@@ -64,4 +64,15 @@ constexpr std::size_t TAR_CHECKSUM_LENGTH = 8;
 constexpr std::size_t TAR_TYPE_OFFSET = 156;
 constexpr std::size_t TAR_PREFIX_OFFSET = 345;
 constexpr std::size_t TAR_PREFIX_LENGTH = 155;
+
+// Application Display Constants
+constexpr std::string_view APP_NAME = "calyx";
+constexpr std::string_view APP_VERSION = "7.2.1";
+
+// Display Constants
+constexpr int APP_AUTHOR_LABEL_WIDTH = 18;
+constexpr int APP_INFO_LABEL_WIDTH = 20;
+constexpr int APP_SWAP_LABEL_WIDTH = 22;
+constexpr double TIME_MINUTES_THRESHOLD = 60.0;
+constexpr double SECONDS_PER_MINUTE = 60.0;
 }  // namespace Config

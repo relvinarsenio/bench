@@ -6,7 +6,7 @@ cmake_policy(SET CMP0135 NEW)
 # =============================================================================
 # Calyx - Rapid Linux Server Profiler
 # =============================================================================
-project(calyx VERSION 7.2.0 LANGUAGES CXX C)
+project(calyx VERSION 7.2.1 LANGUAGES CXX C)
 
 # C++23 Required
 set(CMAKE_CXX_STANDARD 23)
@@ -198,6 +198,7 @@ add_custom_target(generate_cert DEPENDS "${EMBEDDED_CERT_PATH}")
 # =============================================================================
 add_executable(calyx
     src/app/main.cpp
+    src/app/application.cpp
     src/core/interrupts.cpp
     src/core/utils.cpp
     src/core/tgz_extractor.cpp
@@ -205,6 +206,7 @@ add_executable(calyx
     src/os/shell_pipe.cpp
     src/system/system_info.cpp
     src/net/http_client.cpp
+    src/net/http_context.cpp
     src/io/disk_benchmark.cpp
     src/net/speed_test.cpp
     src/ui/cli_renderer.cpp
